@@ -9,9 +9,6 @@
     <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
-    <Resource Include="Assets\AppIcon.ico" />
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="..\AgentGuard.Core\AgentGuard.Core.csproj" />
   </ItemGroup>
 </Project>
