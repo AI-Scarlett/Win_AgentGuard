@@ -1,0 +1,31 @@
+<Application x:Class="AgentGuard.App.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:localization="clr-namespace:AgentGuard.App.Localization"
+             StartupUri="MainWindow.xaml">
+  <Application.Resources>
+    <localization:EnumTextConverter x:Key="EnumTextConverter" />
+    <Style TargetType="Window">
+      <Setter Property="FontFamily" Value="Segoe UI" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="Background" Value="#F6F7F9" />
+    </Style>
+    <Style TargetType="Button">
+      <Setter Property="MinHeight" Value="30" />
+      <Setter Property="Padding" Value="12,4" />
+      <Setter Property="Margin" Value="0,0,8,0" />
+    </Style>
+    <Style TargetType="TextBox">
+      <Setter Property="MinHeight" Value="28" />
+      <Setter Property="Padding" Value="8,4" />
+    </Style>
+    <Style TargetType="DataGrid">
+      <Setter Property="AutoGenerateColumns" Value="False" />
+      <Setter Property="CanUserAddRows" Value="False" />
+      <Setter Property="IsReadOnly" Value="True" />
+      <Setter Property="GridLinesVisibility" Value="Horizontal" />
+      <Setter Property="HeadersVisibility" Value="Column" />
+      <Setter Property="RowHeight" Value="34" />
+    </Style>
+  </Application.Resources>
+</Application>
