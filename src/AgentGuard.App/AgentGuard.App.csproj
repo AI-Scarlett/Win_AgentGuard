@@ -6,7 +6,11 @@
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <AssemblyName>AgentGuard</AssemblyName>
     <RootNamespace>AgentGuard.App</RootNamespace>
+    <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
   </PropertyGroup>
+  <ItemGroup>
+    <Resource Include="Assets\AppIcon.ico" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\AgentGuard.Core\AgentGuard.Core.csproj" />
   </ItemGroup>

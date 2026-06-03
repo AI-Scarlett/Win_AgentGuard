@@ -44,24 +44,38 @@ cd $HOME\Downloads\Win_AgentGuard
 
 Or open `AgentGuard.Windows.sln` in Visual Studio 2022.
 
+## Download
+
+The direct Windows installer is published by GitHub Actions:
+
+```text
+https://github.com/AI-Scarlett/Win_AgentGuard/releases/tag/latest
+```
+
+Download `AgentGuardSetup.exe` from the latest release. The workflow also uploads
+the same installer and a portable zip as build artifacts.
+
 ## Package on Windows
 
-Create a framework-dependent win-x64 package:
+Create a self-contained win-x64 installer and portable zip:
 
 ```powershell
 .\scripts\package.ps1 -Configuration Release -Runtime win-x64
 ```
 
-The output zip is written to:
+The outputs are written to:
 
 ```text
+artifacts\AgentGuardSetup.exe
 artifacts\AgentGuard-Windows-Release-win-x64.zip
 ```
 
-The package script publishes the WPF app and copies `agentguard-bridge.exe` into
-the same folder so hook installation can point agents at the bridge executable.
+The package script publishes the WPF app, copies `agentguard-bridge.exe` into the
+same folder, and builds an Inno Setup installer.
 The GitHub Actions workflow in `.github\workflows\windows-package.yml` runs the
 same script on `windows-latest` and uploads the zip as a workflow artifact.
+
+The WPF window and generated `AgentGuard.exe` use `src\AgentGuard.App\Assets\AppIcon.ico`.
 
 ## Language
 

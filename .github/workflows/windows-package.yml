@@ -9,6 +9,9 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   package:
     runs-on: windows-latest
@@ -16,11 +19,17 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup .NET 8
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
 
       - name: Build and package
         shell: pwsh
@@ -30,4 +39,29 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: AgentGuard-Windows-Release-win-x64
-          path: artifacts\AgentGuard-Windows-Release-win-x64.zip
+          path: |
+            artifacts\AgentGuard-Windows-Release-win-x64.zip
+            artifacts\AgentGuardSetup.exe
+
+      - name: Publish latest release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "latest"
+          $zipPackage = "artifacts\AgentGuard-Windows-Release-win-x64.zip"
+          $installer = "artifacts\AgentGuardSetup.exe"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -f $tag $env:GITHUB_SHA
+          git push origin "refs/tags/$tag" --force
+
+          gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag $installer $zipPackage --repo $env:GITHUB_REPOSITORY --clobber
+            gh release edit $tag --repo $env:GITHUB_REPOSITORY --title "Latest Windows Build" --notes "Download AgentGuardSetup.exe for the direct Windows installer. The zip package is also attached for portable inspection."
+          }
+          else {
+            gh release create $tag $installer $zipPackage --repo $env:GITHUB_REPOSITORY --title "Latest Windows Build" --notes "Download AgentGuardSetup.exe for the direct Windows installer. The zip package is also attached for portable inspection."
+          }
