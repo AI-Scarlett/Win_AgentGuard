@@ -7,7 +7,6 @@
         Height="760"
         MinWidth="980"
         MinHeight="640"
-        Icon="Assets/AppIcon.ico"
         Loaded="Window_Loaded"
         Closed="Window_Closed">
   <DockPanel>
