@@ -21,21 +21,28 @@ public sealed class HookInstaller
 
     public bool CheckHealth(AgentIntegrationProfile profile)
     {
-        var configPath = profile.FullConfigurationPath(_paths.UserProfile);
-        if (profile.InstallationKind == InstallationKind.PluginDirectory)
+        try
         {
-            return Directory.Exists(configPath) &&
-                   Directory.EnumerateFiles(configPath, "*", SearchOption.AllDirectories)
-                       .Any(file => Path.GetFileName(file).Contains(Marker, StringComparison.OrdinalIgnoreCase));
-        }
+            var configPath = profile.FullConfigurationPath(_paths.UserProfile);
+            if (profile.InstallationKind == InstallationKind.PluginDirectory)
+            {
+                return Directory.Exists(configPath) &&
+                       Directory.EnumerateFiles(configPath, "*", SearchOption.AllDirectories)
+                           .Any(file => Path.GetFileName(file).Contains(Marker, StringComparison.OrdinalIgnoreCase));
+            }
 
-        if (!File.Exists(configPath))
+            if (!File.Exists(configPath))
+            {
+                return false;
+            }
+
+            var content = File.ReadAllText(configPath);
+            return content.Contains(Marker, StringComparison.OrdinalIgnoreCase);
+        }
+        catch
         {
             return false;
         }
-
-        var content = File.ReadAllText(configPath);
-        return content.Contains(Marker, StringComparison.OrdinalIgnoreCase);
     }
 
     public async Task InstallAsync(AgentIntegrationProfile profile, string? bridgeExecutablePath = null, CancellationToken cancellationToken = default)

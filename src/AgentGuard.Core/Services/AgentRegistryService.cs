@@ -22,25 +22,40 @@ public sealed class AgentRegistryService
         foreach (var profile in Profiles)
         {
             var configPath = profile.FullConfigurationPath(_paths.UserProfile);
-            var configExists = File.Exists(configPath) || Directory.Exists(configPath);
-            var executableExists = await ExecutableExistsAsync(profile.Executable, cancellationToken);
-            var hookHealthy = profile.SupportsHookInstall && _hookInstaller.CheckHealth(profile);
-
-            var status = hookHealthy
-                ? AdapterStatus.Active
-                : configExists || executableExists
-                    ? AdapterStatus.Installed
-                    : AdapterStatus.Unavailable;
-
-            states.Add(new AgentAdapterState
+            try
             {
-                AgentId = profile.Id,
-                DisplayName = profile.DisplayName,
-                Executable = profile.Executable,
-                ConfigurationPath = configPath,
-                SupportsHookInstall = profile.SupportsHookInstall,
-                Status = status
-            });
+                var configExists = File.Exists(configPath) || Directory.Exists(configPath);
+                var executableExists = await ExecutableExistsAsync(profile.Executable, cancellationToken);
+                var hookHealthy = profile.SupportsHookInstall && _hookInstaller.CheckHealth(profile);
+
+                var status = hookHealthy
+                    ? AdapterStatus.Active
+                    : configExists || executableExists
+                        ? AdapterStatus.Installed
+                        : AdapterStatus.Unavailable;
+
+                states.Add(new AgentAdapterState
+                {
+                    AgentId = profile.Id,
+                    DisplayName = profile.DisplayName,
+                    Executable = profile.Executable,
+                    ConfigurationPath = configPath,
+                    SupportsHookInstall = profile.SupportsHookInstall,
+                    Status = status
+                });
+            }
+            catch
+            {
+                states.Add(new AgentAdapterState
+                {
+                    AgentId = profile.Id,
+                    DisplayName = profile.DisplayName,
+                    Executable = profile.Executable,
+                    ConfigurationPath = configPath,
+                    SupportsHookInstall = profile.SupportsHookInstall,
+                    Status = AdapterStatus.Error
+                });
+            }
         }
 
         return states.OrderBy(item => item.DisplayName).ToList();

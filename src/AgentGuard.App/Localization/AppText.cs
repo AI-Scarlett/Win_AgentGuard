@@ -94,6 +94,10 @@ public static class AppText
 
     public static string StartingAgentGuard => T("Starting AgentGuard...", "正在启动 AgentGuard...");
     public static string AgentGuardReady => T("AgentGuard is ready.", "AgentGuard 已就绪。");
+    public static string AgentGuardReadyWithWarnings(string warnings) =>
+        T($"AgentGuard opened with startup warnings: {warnings}", $"AgentGuard 已打开，但启动时有警告：{warnings}");
+    public static string StartupError(string message) =>
+        T($"Startup failed: {message}", $"启动失败：{message}");
     public static string WindowsMonitorRunning => T("Windows monitor is running.", "Windows 本地监控已运行。");
     public static string WindowsMonitorStopped => T("Windows monitor stopped.", "Windows 本地监控已停止。");
     public static string InstallingHooksFor(string displayName) =>

@@ -1,4 +1,5 @@
 using System.Windows;
+using AgentGuard.App.Diagnostics;
 using AgentGuard.App.ViewModels;
 
 namespace AgentGuard.App;
@@ -15,11 +16,31 @@ public partial class MainWindow : Window
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
     {
-        await _viewModel.InitializeAsync();
+        try
+        {
+            await _viewModel.InitializeAsync();
+        }
+        catch (Exception ex)
+        {
+            AppDiagnostics.Log("Main window startup failed.", ex);
+            _viewModel.ReportStartupError(ex);
+            MessageBox.Show(
+                $"AgentGuard could not finish startup.\n\nLog: {AppDiagnostics.LogPath}\n\n{ex.Message}",
+                "AgentGuard",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
     }
 
     private void Window_Closed(object? sender, EventArgs e)
     {
-        _viewModel.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        try
+        {
+            _viewModel.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            AppDiagnostics.Log("Main window shutdown failed.", ex);
+        }
     }
 }

@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows;
+using AgentGuard.App.Diagnostics;
 using AgentGuard.App.Localization;
 using AgentGuard.Core.Models;
 using AgentGuard.Core.Services;
@@ -152,17 +153,25 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
     public async Task InitializeAsync()
     {
-        await _guardAnalyzer.LoadAsync();
-        await _sessionStore.LoadAsync();
-        await _auditLog.LoadAsync();
+        var startupWarnings = new List<string>();
+        await RunStartupStepAsync("load guard data", _guardAnalyzer.LoadAsync, startupWarnings);
+        await RunStartupStepAsync("load sessions", _sessionStore.LoadAsync, startupWarnings);
+        await RunStartupStepAsync("load audit log", _auditLog.LoadAsync, startupWarnings);
         SyncGuard();
         SyncSessions();
         SyncAudit();
         SyncPendingRequests();
-        await RefreshAgentsAsync();
-        await StartServerAsync();
-        await StartMonitoring();
-        StatusMessage = AppText.AgentGuardReady;
+        await RunStartupStepAsync("refresh agents", RefreshAgentsAsync, startupWarnings);
+        await RunStartupStepAsync("start hook server", StartServerAsync, startupWarnings);
+        await RunStartupStepAsync("start Windows monitor", StartMonitoring, startupWarnings);
+        StatusMessage = startupWarnings.Count == 0
+            ? AppText.AgentGuardReady
+            : AppText.AgentGuardReadyWithWarnings(string.Join("; ", startupWarnings));
+    }
+
+    public void ReportStartupError(Exception exception)
+    {
+        StatusMessage = AppText.StartupError(exception.Message);
     }
 
     public async ValueTask DisposeAsync()
@@ -406,5 +415,31 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     {
         var path = Path.Combine(AppContext.BaseDirectory, "agentguard-bridge.exe");
         return File.Exists(path) ? path : null;
+    }
+
+    private static async Task RunStartupStepAsync(string name, Func<CancellationToken, Task> action, List<string> warnings)
+    {
+        try
+        {
+            await action(CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            AppDiagnostics.Log($"Startup step failed: {name}.", ex);
+            warnings.Add($"{name}: {ex.Message}");
+        }
+    }
+
+    private static async Task RunStartupStepAsync(string name, Func<Task> action, List<string> warnings)
+    {
+        try
+        {
+            await action();
+        }
+        catch (Exception ex)
+        {
+            AppDiagnostics.Log($"Startup step failed: {name}.", ex);
+            warnings.Add($"{name}: {ex.Message}");
+        }
     }
 }
