@@ -63,6 +63,7 @@ public static class AppText
     public static string Sessions => T("Sessions", "会话");
     public static string Phase => T("Phase", "阶段");
     public static string LastTool => T("Last Tool", "最近工具");
+    public static string LastActivity => T("Last Activity", "最近活动");
     public static string Cwd => T("Cwd", "工作目录");
     public static string CommandRules => T("Command Rules", "命令规则");
     public static string List => T("List", "列表");
