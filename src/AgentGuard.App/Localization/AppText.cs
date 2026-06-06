@@ -138,7 +138,6 @@ public static class AppText
     public static string ErrorsLabel => T("Errors", "错误");
     public static string ClearHistoryFilter => T("Clear session filter", "清除会话过滤");
     public static string ClearHistoryFilterTip => T("Show all records, not just the selected session.", "显示全部记录，不仅是当前选中会话。");
-    public static string Project => T("Project", "项目");
     public static string Source => T("Source", "来源");
 
     public static string ExportAudit => T("Export Audit...", "导出审计...");
