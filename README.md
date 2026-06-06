@@ -1,9 +1,37 @@
 # AgentGuard for Windows
 
-AgentGuard for Windows is a native WPF port of the current macOS AgentGuard feature set. It keeps the same product shape:
+> **Repository archived — source code removed.**
+>
+> This repo is kept only as a release pointer. The Windows source tree
+> (`src/`, `tools/`, `scripts/`, `.github/workflows/`, solution file and
+> MSBuild props) has been intentionally removed; the build workflow no
+> longer exists. The git history up to the removal commit is preserved
+> for reference but cannot be used to rebuild the binaries.
+>
+> To rebuild from scratch, recover the source from your local working
+> copy or from the last commit before the removal (`60bda58` and earlier).
+
+## Where to get the binary
+
+The Windows installer and portable build are published on the unified
+AgentGuard release:
+
+👉 **https://github.com/AI-Scarlett/AIMacCleaner/releases/tag/v2.1.9**
+
+| Asset | Size | Use it for |
+|---|---|---|
+| `AgentGuardSetup.exe` | ~51 MB | Installing AgentGuard on a Windows machine (Inno Setup) |
+| `AgentGuard-Windows-Release-win-x64.zip` | ~71 MB | Portable / extract-anywhere build |
+| `AgentGuard-v2.1.9-arm64.dmg` | ~7 MB | macOS Apple Silicon build (sister project) |
+
+## What AgentGuard for Windows is (was)
+
+AgentGuard for Windows is a native WPF port of the macOS AgentGuard
+feature set. It kept the same product shape:
 
 - Agent Center with approvals first
-- local hook server for PermissionRequest, AskQuestion, and PlanApproval events
+- local hook server for `PermissionRequest`, `AskQuestion`, and
+  `PlanApproval` events
 - agent integration detection and hook installation
 - session, token, tool, and audit tracking
 - protected-folder monitoring
@@ -11,140 +39,20 @@ AgentGuard for Windows is a native WPF port of the current macOS AgentGuard feat
 - historical Agent activity scanner (Agent History tab)
 - Windows Action Center toast for new pending approvals
 - configurable bridge path and audit export
-- process tree attribution (parent PID + parent name) on monitored launches
+- process tree attribution (parent PID + parent name) on monitored
+  launches
 
-The macOS app uses FSEvents and a Unix domain socket. This Windows version uses `FileSystemWatcher` and a local named pipe:
+## Project docs (preserved here for reference)
 
-```text
-\\.\pipe\agentguard-hook
-```
+- [`docs/AGENT_DATA_FORMATS.md`](docs/AGENT_DATA_FORMATS.md) — research
+  notes for Claude / Codex / Cursor / OpenClaw / Hermes session formats,
+  paths, and fields used by the Agent History scanner.
+- [`docs/PROJECT_AUDIT.md`](docs/PROJECT_AUDIT.md) — original project
+  audit log.
+- [`docs/PROJECT_REQUIREMENTS.md`](docs/PROJECT_REQUIREMENTS.md) —
+  original product requirements.
 
-## Project Layout
+## License
 
-```text
-Win_AgentGuard/
-  AgentGuard.Windows.sln
-  docs/
-    PROJECT_REQUIREMENTS.md
-  src/
-    AgentGuard.App/          WPF desktop application
-    AgentGuard.Core/         models, hook server, stores, monitors
-    AgentGuard.HookBridge/   stdin-to-named-pipe bridge for agent hooks
-  tools/
-    AgentGuard.SmokeTest/    small console smoke checks
-  scripts/
-    build.ps1
-    install-hooks.ps1
-```
-
-## Build on Windows
-
-Install .NET 8 SDK, then run:
-
-```powershell
-cd $HOME\Downloads\Win_AgentGuard
-.\scripts\build.ps1
-```
-
-Or open `AgentGuard.Windows.sln` in Visual Studio 2022.
-
-## Download
-
-The direct Windows installer is published by GitHub Actions:
-
-```text
-https://github.com/AI-Scarlett/Win_AgentGuard/releases/tag/latest
-```
-
-Download `AgentGuardSetup.exe` from the latest release. The workflow also uploads
-the same installer and a portable zip as build artifacts.
-
-## Package on Windows
-
-Create a self-contained win-x64 installer and portable zip:
-
-```powershell
-.\scripts\package.ps1 -Configuration Release -Runtime win-x64
-```
-
-The outputs are written to:
-
-```text
-artifacts\AgentGuardSetup.exe
-artifacts\AgentGuard-Windows-Release-win-x64.zip
-```
-
-The package script publishes the WPF app, copies `agentguard-bridge.exe` into the
-same folder, and builds an Inno Setup installer.
-The GitHub Actions workflow in `.github\workflows\windows-package.yml` runs the
-same script on `windows-latest` and uploads the zip as a workflow artifact.
-
-The WPF window and generated `AgentGuard.exe` use `src\AgentGuard.App\Assets\AppIcon.ico`.
-
-## Language
-
-AgentGuard follows the current UI culture and supports English and Chinese UI
-text. Set `AGENTGUARD_LANG` to force a language during testing:
-
-```powershell
-$env:AGENTGUARD_LANG = "zh-CN"
-dotnet run --project .\src\AgentGuard.App\AgentGuard.App.csproj
-```
-
-Use `en-US` to force English.
-
-## Requirements
-
-The Windows maintenance handoff and feature requirements live in:
-
-```text
-docs\PROJECT_REQUIREMENTS.md
-```
-
-## Run
-
-```powershell
-dotnet run --project .\src\AgentGuard.App\AgentGuard.App.csproj
-```
-
-The app stores local state under:
-
-```text
-%APPDATA%\AgentGuard
-```
-
-## Hook Protocol
-
-Agent hooks can send a single JSON object per line to the bridge. The bridge forwards it to AgentGuard and prints the response:
-
-```powershell
-'{"event":"PermissionRequest","session_id":"demo","agent":"Codex","cwd":"C:\\Work","tool":"Write","tool_input":"{\"file_path\":\"C:\\Work\\app.cs\"}","diff":"demo change","options":["allow","deny"]}' |
-  .\src\AgentGuard.HookBridge\bin\Debug\net8.0\agentguard-bridge.exe
-```
-
-Permission responses include both the simple fields and the hook-specific output shape used by the macOS implementation.
-
-## Current Scope
-
-This version is intentionally native and dependency-light. It does not depend on Electron, Avalonia, or external NuGet UI packages.
-
-Implemented now:
-
-- WPF shell and Agent Center tabs (Approvals, Audit, Integrations, Sessions, Command Rules, Alerts, History, Settings)
-- named-pipe hook server
-- pending approval/question/plan queue
-- JSON/YAML hook installer with AgentGuard sentinels
-- process polling for known AI agent names (24+ agents, including Dify / CrewAI / AutoGen / OpenHands / MetaGPT / CAMEL / DeerFlow / BrowserUse / MiniMax / Lingma / Warp / Tabnine / Amazon Q and others)
-- protected folder audit through `FileSystemWatcher`
-- process tree attribution via `NtQueryInformationProcess` (parent PID + parent name)
-- command rule matching, sensitive file alerts, hourly operation statistics
-- JSON persistence under `%APPDATA%\AgentGuard`
-- historical Agent activity scanner (Agent History tab) — walks `~/.claude/projects`, `~/.codex/sessions` (JSONL + `state_5.sqlite` + `logs_2.sqlite`), `~/.hermes/sessions` (per-session JSON + `state.db`), `~/.openclaw` / `~/.qclaw` / `~/.easyclaw` (per-agent nested JSONL), `~/.kimi`, `~/.cursor` / `~/.trae` / `~/.codebuddy` / `~/.windsurf` (per-workspace `state.vscdb` + global `state.vscdb` + `chatSessions/` + `workspace.json` + `file-changes-*.json`); rolls them up into sessions + records for the Agent History tab
-- Windows Action Center toast for new pending approvals (PowerShell + WinRT `ToastNotificationManager`, no external NuGet)
-- configurable bridge path + audit export to CSV/JSON from the Settings tab
-
-Planned hardening:
-
-- ETW provider for richer process-to-file attribution
-- installer/MSIX packaging
-- code signing and auto-start registration
+No license file is shipped. Treat the source as All Rights Reserved by
+the original authors.
