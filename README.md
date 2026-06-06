@@ -13,16 +13,18 @@
 
 ## Where to get the binary
 
-The Windows installer and portable build are published on the unified
-AgentGuard release:
+The Windows installer is published on the unified AgentGuard release:
 
 👉 **https://github.com/AI-Scarlett/AIMacCleaner/releases/tag/v2.1.9**
 
 | Asset | Size | Use it for |
 |---|---|---|
 | `AgentGuardSetup.exe` | ~51 MB | Installing AgentGuard on a Windows machine (Inno Setup) |
-| `AgentGuard-Windows-Release-win-x64.zip` | ~71 MB | Portable / extract-anywhere build |
 | `AgentGuard-v2.1.9-arm64.dmg` | ~7 MB | macOS Apple Silicon build (sister project) |
+
+A portable/extract-anywhere build is **not** distributed to keep the
+debug-symbol surface minimal — the Inno Setup installer above is the
+only Windows binary shipped.
 
 ## What AgentGuard for Windows is (was)
 
