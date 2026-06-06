@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using AgentGuard.Core.Models;
 
 namespace AgentGuard.Core.Services;
@@ -146,6 +147,7 @@ public sealed class WindowsOperationMonitor : IDisposable
     private Task ScanProcessesAsync()
     {
         var currentAgents = new Dictionary<int, string>();
+        var parentMap = new Dictionary<int, int>();
         foreach (var process in Process.GetProcesses())
         {
             try
@@ -154,6 +156,14 @@ public sealed class WindowsOperationMonitor : IDisposable
                 if (!string.IsNullOrWhiteSpace(agentName))
                 {
                     currentAgents[process.Id] = agentName;
+                }
+                try
+                {
+                    parentMap[process.Id] = GetParentProcessId(process);
+                }
+                catch
+                {
+                    // Some processes exit while we are inspecting; ignore.
                 }
             }
             catch
@@ -176,12 +186,18 @@ public sealed class WindowsOperationMonitor : IDisposable
                 var agentName = currentAgents[pid];
                 _knownAgentProcesses[pid] = agentName;
                 ActiveAgentNames.Add(agentName);
+                var parentPid = parentMap.TryGetValue(pid, out var pp) ? pp : 0;
+                var parentName = parentPid > 0 && currentAgents.TryGetValue(parentPid, out var pn)
+                    ? pn
+                    : (parentMap.TryGetValue(parentPid, out var _) ? TryGetProcessName(parentPid) : string.Empty);
                 var lifecycle = new ProcessLifecycleEvent
                 {
                     EventType = "launch",
                     ProcessId = pid,
+                    ParentProcessId = parentPid,
                     AgentName = agentName,
-                    ProcessName = agentName
+                    ProcessName = agentName,
+                    Arguments = parentName
                 };
                 ProcessEvents.Insert(0, lifecycle);
                 Trim(ProcessEvents, 1000);
@@ -192,10 +208,12 @@ public sealed class WindowsOperationMonitor : IDisposable
             {
                 var agentName = _knownAgentProcesses[pid];
                 _knownAgentProcesses.Remove(pid);
+                var parentPid = parentMap.TryGetValue(pid, out var pp) ? pp : 0;
                 var lifecycle = new ProcessLifecycleEvent
                 {
                     EventType = "exit",
                     ProcessId = pid,
+                    ParentProcessId = parentPid,
                     AgentName = agentName,
                     ProcessName = agentName
                 };
@@ -212,6 +230,66 @@ public sealed class WindowsOperationMonitor : IDisposable
 
         Changed?.Invoke(this, EventArgs.Empty);
         return Task.CompletedTask;
+    }
+
+    private static int GetParentProcessId(Process process)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return 0;
+        }
+        try
+        {
+            var pbi = new ProcessBasicInformation();
+            int returnLength;
+            int status = NtQueryInformationProcess(
+                process.Handle,
+                0, // ProcessBasicInformation
+                ref pbi,
+                Marshal.SizeOf<ProcessBasicInformation>(),
+                out returnLength);
+            if (status == 0)
+            {
+                return pbi.InheritedFromUniqueProcessId.ToInt32();
+            }
+        }
+        catch
+        {
+            // Some processes cannot be inspected (system, protected, exited).
+        }
+        return 0;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct ProcessBasicInformation
+    {
+        public IntPtr Reserved1;
+        public IntPtr PebBaseAddress;
+        public IntPtr Reserved2_0;
+        public IntPtr Reserved2_1;
+        public IntPtr UniqueProcessId;
+        public IntPtr InheritedFromUniqueProcessId;
+    }
+
+    [DllImport("ntdll.dll", SetLastError = true)]
+    private static extern int NtQueryInformationProcess(
+        IntPtr processHandle,
+        int processInformationClass,
+        ref ProcessBasicInformation processInformation,
+        int processInformationLength,
+        out int returnLength);
+
+    private static string TryGetProcessName(int pid)
+    {
+        try
+        {
+            using var p = Process.GetProcessById(pid);
+            return p.ProcessName;
+        }
+        catch
+        {
+            return string.Empty;
+        }
     }
 
     private void RecordFileEvent(string path, OperationType operationType, string detail)

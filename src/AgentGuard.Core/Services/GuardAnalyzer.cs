@@ -363,6 +363,7 @@ public sealed class GuardAnalyzer
                 HourlyStats = HourlyStats.OrderBy(item => item.Hour).TakeLast(168).ToList();
             }
 
+            // Atomic check-and-set inside the gate to avoid duplicate IO.
             if (DateTimeOffset.Now - _lastStatsSave > TimeSpan.FromSeconds(30))
             {
                 _lastStatsSave = DateTimeOffset.Now;

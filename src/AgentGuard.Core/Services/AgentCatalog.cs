@@ -19,7 +19,7 @@ public static class AgentCatalog
         ("Copilot", ["copilot", "github-copilot"]),
         ("Cline", ["cline"]),
         ("OpenClaw", ["openclaw", "open-claw"]),
-        ("QClaw", ["qclaw", "q-claw"]),
+        ("QClaw", ["qclaw", "q-claw", "easyclaw"]),
         ("Hermes", ["hermes"]),
         ("Codex", ["codex"]),
         ("Augment", ["augment"]),
@@ -29,7 +29,26 @@ public static class AgentCatalog
         ("Roo Code", ["roo code", "roo-code", "roocode"]),
         ("Tabby", ["tabby"]),
         ("Cody", ["cody"]),
-        ("OpenHands", ["openhands", "open-hands"])
+        ("OpenHands", ["openhands", "open-hands"]),
+        ("Dify", ["dify"]),
+        ("CrewAI", ["crewai"]),
+        ("AutoGen", ["autogen"]),
+        ("MetaGPT", ["metagpt"]),
+        ("CAMEL", ["camel"]),
+        ("DeerFlow", ["deerflow"]),
+        ("BrowserUse", ["browser-use", "browseruse"]),
+        ("Huginn", ["huginn"]),
+        ("AgentGPT", ["agentgpt"]),
+        ("LobeHub", ["lobehub"]),
+        ("LangGraph", ["langgraph"]),
+        ("Swarm", ["swarm"]),
+        ("AgentScope", ["agentscope"]),
+        ("MiniMax", ["MiniMax", "MiniMax-code", "MiniMaxcode"]),
+        ("Lingma", ["lingma"]),
+        ("Tabnine", ["tabnine"]),
+        ("Warp", ["warp"]),
+        ("Whitzard", ["whitzard"]),
+        ("Amazon Q", ["amazon-q", "amazonq"])
     ];
 
     public static IReadOnlyList<AgentIntegrationProfile> Profiles { get; } =
@@ -131,7 +150,75 @@ public static class AgentCatalog
             [Plain("PreToolUse"), Plain("PostToolUse"), Plain("PermissionRequest"), Plain("Stop")]),
 
         JsonTyped("autoclaw", "AutoClaw", "autoclaw", ".autoclaw/settings.json",
-            [Plain("PreToolUse"), Plain("PostToolUse"), Plain("PermissionRequest"), Plain("Stop")])
+            [Plain("PreToolUse"), Plain("PostToolUse"), Plain("PermissionRequest"), Plain("Stop")]),
+
+        // Agent frameworks and multi-agent orchestrators (from MacCleaner's 50+ list).
+        // These typically have a settings.json, a CLI, or a CLI config dir.
+        JsonTyped("dify", "Dify", "dify", ".dify/settings.json",
+            [Plain("PreToolUse"), Plain("PostToolUse"), Plain("Notification"), Plain("Stop")]),
+
+        JsonTyped("crewai", "CrewAI", "crewai", ".crewai/settings.json",
+            [Plain("PreToolUse"), Plain("PostToolUse"), Plain("Notification"), Plain("Stop")]),
+
+        JsonTyped("autogen", "AutoGen", "autogen", ".autogen/settings.json",
+            [Plain("PreToolUse"), Plain("PostToolUse"), Plain("Notification"), Plain("Stop")]),
+
+        JsonTyped("openhands", "OpenHands", "openhands", ".openhands/settings.json",
+            [Plain("PreToolUse"), Plain("PostToolUse"), Plain("Notification"), Plain("Stop")]),
+
+        JsonTyped("metagpt", "MetaGPT", "metagpt", ".metagpt/settings.json",
+            [Plain("PreToolUse"), Plain("PostToolUse"), Plain("Notification"), Plain("Stop")]),
+
+        JsonTyped("camel", "CAMEL", "camel", ".camel/settings.json",
+            [Plain("PreToolUse"), Plain("PostToolUse"), Plain("Notification"), Plain("Stop")]),
+
+        JsonTyped("deerflow", "DeerFlow", "deerflow", ".deerflow/settings.json",
+            [Plain("PreToolUse"), Plain("PostToolUse"), Plain("Notification"), Plain("Stop")]),
+
+        JsonTyped("browseruse", "BrowserUse", "browser-use", ".browseruse/settings.json",
+            [Plain("PreToolUse"), Plain("PostToolUse"), Plain("Notification"), Plain("Stop")]),
+
+        JsonTyped("huginn", "Huginn", "huginn", ".huginn/settings.json",
+            [Plain("PreToolUse"), Plain("PostToolUse"), Plain("Notification"), Plain("Stop")]),
+
+        JsonTyped("agentgpt", "AgentGPT", "agentgpt", ".agentgpt/settings.json",
+            [Plain("PreToolUse"), Plain("PostToolUse"), Plain("Notification"), Plain("Stop")]),
+
+        JsonTyped("lobehub", "LobeHub", "lobehub", ".lobehub/settings.json",
+            [Plain("PreToolUse"), Plain("PostToolUse"), Plain("Notification"), Plain("Stop")]),
+
+        JsonTyped("langgraph", "LangGraph", "langgraph", ".langgraph/settings.json",
+            [Plain("PreToolUse"), Plain("PostToolUse"), Plain("Notification"), Plain("Stop")]),
+
+        JsonTyped("agentscope", "AgentScope", "agentscope", ".agentscope/settings.json",
+            [Plain("PreToolUse"), Plain("PostToolUse"), Plain("Notification"), Plain("Stop")]),
+
+        JsonTyped("swarm", "Swarm", "swarm", ".swarm/settings.json",
+            [Plain("PreToolUse"), Plain("PostToolUse"), Plain("Notification"), Plain("Stop")]),
+
+        JsonTyped("mavis", "MiniMax", "MiniMax", ".MiniMax/settings.json",
+            [Plain("PreToolUse"), Plain("PostToolUse"), Plain("Notification"), Plain("Stop")]),
+
+        JsonTyped("lingma", "Lingma", "lingma", ".lingma/settings.json",
+            [Plain("PreToolUse"), Plain("PostToolUse"), Plain("Notification"), Plain("Stop")]),
+
+        JsonTyped("tabnine", "Tabnine", "tabnine", ".tabnine/settings.json",
+            [Plain("PreToolUse"), Plain("PostToolUse"), Plain("Notification"), Plain("Stop")]),
+
+        JsonTyped("warp", "Warp", "warp", ".warp/settings.json",
+            [Plain("PreToolUse"), Plain("PostToolUse"), Plain("Notification"), Plain("Stop")]),
+
+        JsonTyped("whitzard", "Whitzard", "whitzard", ".whitzard/settings.json",
+            [Plain("PreToolUse"), Plain("PostToolUse"), Plain("Notification"), Plain("Stop")]),
+
+        JsonTyped("amazonq", "Amazon Q", "amazon-q", ".amazonq/settings.json",
+            [Plain("PreToolUse"), Plain("PostToolUse"), Plain("Notification"), Plain("Stop")]),
+
+        JsonTyped("roo", "Roo Code", "roo", ".roo/settings.json",
+            [Plain("PreToolUse"), Plain("PostToolUse"), Plain("Notification"), Plain("Stop")]),
+
+        JsonTyped("aider", "Aider", "aider", ".aider/settings.json",
+            [Plain("PreToolUse"), Plain("PostToolUse"), Plain("Notification"), Plain("Stop")])
     ];
 
     public static string ResolveAgentName(string processName, string arguments = "")

@@ -122,5 +122,42 @@ public static class AppText
     public static string ProtectedDirectoryAdded => T("Protected directory added.", "受保护目录已添加。");
     public static string ProtectedDirectoryAlreadyExists => T("Protected directory already exists.", "受保护目录已存在。");
 
+    public static string History => T("Agent History", "Agent 历史");
+    public static string ScanAgentHistory => T("Scan Agent History", "扫描 Agent 历史");
+    public static string ScanAgentHistoryTip => T("Walk known AI agent data directories and parse their session logs.", "扫描本机已知 AI Agent 的数据目录并解析会话日志。");
+    public static string ScanningAgentHistory => T("Scanning agent history...", "正在扫描 Agent 历史...");
+    public static string AgentHistoryScanCompleted(int sessions, int records, int files) =>
+        T($"Scanned {files} files: {sessions} sessions, {records} records.",
+            $"扫描了 {files} 个文件：{sessions} 个会话，{records} 条记录。");
+    public static string AgentHistoryScanFailed(string message) =>
+        T($"Agent history scan failed: {message}", $"Agent 历史扫描失败：{message}");
+    public static string AgentHistoryTabDescription =>
+        T("Discover and audit historical AI agent activity on this machine.", "发现并审计本机 AI Agent 的历史操作。");
+    public static string SessionsLabel => T("Sessions", "会话");
+    public static string RecordsLabel => T("Records", "记录");
+    public static string ErrorsLabel => T("Errors", "错误");
+    public static string ClearHistoryFilter => T("Clear session filter", "清除会话过滤");
+    public static string ClearHistoryFilterTip => T("Show all records, not just the selected session.", "显示全部记录，不仅是当前选中会话。");
+    public static string Project => T("Project", "项目");
+    public static string Source => T("Source", "来源");
+
+    public static string ExportAudit => T("Export Audit...", "导出审计...");
+    public static string ExportAuditTip => T("Export the current audit log to CSV or JSON.", "把当前审计记录导出为 CSV 或 JSON。");
+    public static string ExportAuditDialogTitle => T("Export AgentGuard audit", "导出 AgentGuard 审计");
+    public static string AuditExported(string path, int count) =>
+        T($"Exported {count} records to {path}.", $"已导出 {count} 条记录到 {path}。");
+    public static string AuditExportFailed(string message) =>
+        T($"Audit export failed: {message}", $"审计导出失败：{message}");
+
+    public static string ChooseBridgePath => T("Choose Bridge...", "选择 Bridge...");
+    public static string ChooseBridgePathTitle => T("Select agentguard-bridge.exe", "选择 agentguard-bridge.exe");
+    public static string BridgePathLabel => T("Hook bridge path", "Hook 桥接器路径");
+    public static string BridgePathTip => T("Path to agentguard-bridge.exe used when installing hooks. Leave empty to use the bundled copy.", "安装 hook 时使用的 agentguard-bridge.exe 路径。留空则使用自带的副本。");
+    public static string NotificationsEnabledLabel => T("Windows toast notifications", "Windows 通知");
+    public static string NotificationsEnabledTip => T("Show an Action Center toast when a new pending approval arrives.", "新的待审批请求到达时弹出系统通知。");
+
+    public static string NotificationPendingTitle(string agentName) =>
+        T($"New approval request from {agentName}", $"来自 {agentName} 的新审批请求");
+
     private static string T(string en, string zh) => IsChinese ? zh : en;
 }

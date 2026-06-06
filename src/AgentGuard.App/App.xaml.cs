@@ -1,10 +1,14 @@
 using System.Windows;
 using AgentGuard.App.Diagnostics;
+using AgentGuard.App.Services;
+using AgentGuard.Core.Services;
 
 namespace AgentGuard.App;
 
 public partial class App : Application
 {
+    public static INotificationService Notifications { get; private set; } = new NullNotificationService();
+
     protected override void OnStartup(StartupEventArgs e)
     {
         AppDiagnostics.Log("AgentGuard starting.");
@@ -25,6 +29,16 @@ public partial class App : Application
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
         };
+
+        try
+        {
+            Notifications = new WindowsToastNotificationService(new Core.Services.AppPaths());
+        }
+        catch (Exception ex)
+        {
+            AppDiagnostics.Log("Toast notification service init failed; using null service.", ex);
+            Notifications = new NullNotificationService();
+        }
 
         base.OnStartup(e);
     }

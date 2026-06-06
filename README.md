@@ -8,6 +8,10 @@ AgentGuard for Windows is a native WPF port of the current macOS AgentGuard feat
 - session, token, tool, and audit tracking
 - protected-folder monitoring
 - command rules and sensitive-file alerts
+- historical Agent activity scanner (Agent History tab)
+- Windows Action Center toast for new pending approvals
+- configurable bridge path and audit export
+- process tree attribution (parent PID + parent name) on monitored launches
 
 The macOS app uses FSEvents and a Unix domain socket. This Windows version uses `FileSystemWatcher` and a local named pipe:
 
@@ -126,18 +130,21 @@ This version is intentionally native and dependency-light. It does not depend on
 
 Implemented now:
 
-- WPF shell and Agent Center tabs
+- WPF shell and Agent Center tabs (Approvals, Audit, Integrations, Sessions, Command Rules, Alerts, History, Settings)
 - named-pipe hook server
 - pending approval/question/plan queue
 - JSON/YAML hook installer with AgentGuard sentinels
-- process polling for known AI agent names
+- process polling for known AI agent names (24+ agents, including Dify / CrewAI / AutoGen / OpenHands / MetaGPT / CAMEL / DeerFlow / BrowserUse / MiniMax / Lingma / Warp / Tabnine / Amazon Q and others)
 - protected folder audit through `FileSystemWatcher`
+- process tree attribution via `NtQueryInformationProcess` (parent PID + parent name)
 - command rule matching, sensitive file alerts, hourly operation statistics
 - JSON persistence under `%APPDATA%\AgentGuard`
+- historical Agent activity scanner (Agent History tab) — walks `~/.claude/projects`, `~/.codex/sessions` (JSONL + `state_5.sqlite` + `logs_2.sqlite`), `~/.hermes/sessions` (per-session JSON + `state.db`), `~/.openclaw` / `~/.qclaw` / `~/.easyclaw` (per-agent nested JSONL), `~/.kimi`, `~/.cursor` / `~/.trae` / `~/.codebuddy` / `~/.windsurf` (per-workspace `state.vscdb` + global `state.vscdb` + `chatSessions/` + `workspace.json` + `file-changes-*.json`); rolls them up into sessions + records for the Agent History tab
+- Windows Action Center toast for new pending approvals (PowerShell + WinRT `ToastNotificationManager`, no external NuGet)
+- configurable bridge path + audit export to CSV/JSON from the Settings tab
 
 Planned hardening:
 
 - ETW provider for richer process-to-file attribution
-- Windows notification toast integration
 - installer/MSIX packaging
 - code signing and auto-start registration

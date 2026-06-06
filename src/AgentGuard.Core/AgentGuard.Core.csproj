@@ -4,4 +4,7 @@
     <AssemblyName>AgentGuard.Core</AssemblyName>
     <RootNamespace>AgentGuard.Core</RootNamespace>
   </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.10" />
+  </ItemGroup>
 </Project>

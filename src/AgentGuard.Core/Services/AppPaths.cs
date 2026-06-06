@@ -16,6 +16,8 @@ public sealed class AppPaths
     public string HourlyStatsPath => Path.Combine(AppDataRoot, "hourly-stats.json");
     public string BridgeScriptPath => Path.Combine(BridgeDirectory, "agentguard-bridge.ps1");
     public string BridgeLogPath => Path.Combine(LogsDirectory, "bridge.log");
+    public string SettingsPath => Path.Combine(AppDataRoot, "settings.json");
+    public string HistoryCachePath => Path.Combine(AppDataRoot, "agent-history-cache.json");
 
     public AppPaths(string? appDataRoot = null, string? userProfile = null)
     {

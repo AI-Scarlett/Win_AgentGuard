@@ -239,6 +239,46 @@
           </DataGrid>
         </TabItem>
 
+        <TabItem Header="{x:Static localization:AppText.History}">
+          <Grid Margin="0,12,0,0">
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <StackPanel>
+              <TextBlock Text="{x:Static localization:AppText.AgentHistoryTabDescription}" Foreground="#6B7280" />
+              <StackPanel Orientation="Horizontal" Margin="0,8,0,8">
+                <Button Content="{x:Static localization:AppText.ScanAgentHistory}" Command="{Binding ScanAgentHistoryCommand}" ToolTip="{x:Static localization:AppText.ScanAgentHistoryTip}" />
+                <Button Content="{x:Static localization:AppText.ClearHistoryFilter}" Command="{Binding ScanAgentHistoryCommand}" ToolTip="{x:Static localization:AppText.ClearHistoryFilterTip}" />
+              </StackPanel>
+              <TextBlock Text="{Binding HistoryStatusMessage}" Foreground="#374151" />
+              <TextBlock Text="{x:Static localization:AppText.SessionsLabel}" FontWeight="SemiBold" Margin="0,12,0,4" />
+              <DataGrid ItemsSource="{Binding HistorySessions}"
+                        SelectedItem="{Binding SelectedSession}"
+                        MaxHeight="180">
+                <DataGrid.Columns>
+                  <DataGridTextColumn Header="{x:Static localization:AppText.Agent}" Binding="{Binding AgentName}" Width="160" />
+                  <DataGridTextColumn Header="{x:Static localization:AppText.Project}" Binding="{Binding Project}" Width="160" />
+                  <DataGridTextColumn Header="{x:Static localization:AppText.LastActivity}" Binding="{Binding LastActivity, StringFormat={}{0:g}}" Width="140" />
+                  <DataGridTextColumn Header="{x:Static localization:AppText.Calls}" Binding="{Binding RecordCount}" Width="80" />
+                  <DataGridTextColumn Header="{x:Static localization:AppText.Source}" Binding="{Binding SourceFile}" Width="*" />
+                </DataGrid.Columns>
+              </DataGrid>
+              <TextBlock Text="{x:Static localization:AppText.RecordsLabel}" FontWeight="SemiBold" Margin="0,12,0,4" />
+            </StackPanel>
+            <DataGrid Grid.Row="1" ItemsSource="{Binding HistoryRecords}">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="{x:Static localization:AppText.Time}" Binding="{Binding Timestamp, StringFormat={}{0:g}}" Width="140" />
+                <DataGridTextColumn Header="{x:Static localization:AppText.Agent}" Binding="{Binding AgentName}" Width="130" />
+                <DataGridTextColumn Header="{x:Static localization:AppText.Type}" Binding="{Binding Operation, Converter={StaticResource EnumTextConverter}}" Width="90" />
+                <DataGridTextColumn Header="{x:Static localization:AppText.Project}" Binding="{Binding Project}" Width="140" />
+                <DataGridTextColumn Header="{x:Static localization:AppText.Target}" Binding="{Binding TargetPath}" Width="*" />
+                <DataGridTextColumn Header="{x:Static localization:AppText.Detail}" Binding="{Binding Detail}" Width="240" />
+              </DataGrid.Columns>
+            </DataGrid>
+          </Grid>
+        </TabItem>
+
         <TabItem Header="{x:Static localization:AppText.CommandRules}">
           <DataGrid ItemsSource="{Binding CommandRules}" Margin="0,12,0,0">
             <DataGrid.Columns>
@@ -283,6 +323,20 @@
                   <TextBox Text="{Binding NewProtectedDirectory, UpdateSourceTrigger=PropertyChanged}"
                            ToolTip="{x:Static localization:AppText.DirectoryExampleTip}" />
                 </DockPanel>
+
+                <TextBlock Text="{x:Static localization:AppText.BridgePathLabel}" FontSize="16" FontWeight="SemiBold" Margin="0,24,0,4" />
+                <DockPanel>
+                  <Button DockPanel.Dock="Right" Content="{x:Static localization:AppText.ChooseBridgePath}" Command="{Binding ChooseBridgePathCommand}" />
+                  <TextBox Text="{Binding Settings.BridgePath, UpdateSourceTrigger=PropertyChanged}" ToolTip="{x:Static localization:AppText.BridgePathTip}" />
+                </DockPanel>
+
+                <CheckBox Content="{x:Static localization:AppText.NotificationsEnabledLabel}"
+                          IsChecked="{Binding Settings.NotificationsEnabled}"
+                          ToolTip="{x:Static localization:AppText.NotificationsEnabledTip}"
+                          Margin="0,16,0,0" />
+
+                <TextBlock Text="{x:Static localization:AppText.ExportAudit}" FontSize="16" FontWeight="SemiBold" Margin="0,24,0,4" />
+                <Button HorizontalAlignment="Left" Content="{x:Static localization:AppText.ExportAudit}" Command="{Binding ExportAuditCommand}" ToolTip="{x:Static localization:AppText.ExportAuditTip}" />
               </StackPanel>
             </Border>
             <Border Grid.Column="1" Background="White" BorderBrush="#E5E7EB" BorderThickness="1" Padding="16">
@@ -301,6 +355,8 @@
                     <DataGridTextColumn Header="{x:Static localization:AppText.Event}" Binding="{Binding EventType, Converter={StaticResource EnumTextConverter}}" Width="70" />
                     <DataGridTextColumn Header="{x:Static localization:AppText.Agent}" Binding="{Binding AgentName}" Width="120" />
                     <DataGridTextColumn Header="{x:Static localization:AppText.Pid}" Binding="{Binding ProcessId}" Width="70" />
+                    <DataGridTextColumn Header="PPID" Binding="{Binding ParentProcessId}" Width="70" />
+                    <DataGridTextColumn Header="Parent" Binding="{Binding Arguments}" Width="*" />
                   </DataGrid.Columns>
                 </DataGrid>
               </StackPanel>

@@ -6,7 +6,7 @@ namespace AgentGuard.App;
 
 public partial class MainWindow : Window
 {
-    private readonly MainViewModel _viewModel = new();
+    private readonly MainViewModel _viewModel = new(App.Notifications);
 
     public MainWindow()
     {

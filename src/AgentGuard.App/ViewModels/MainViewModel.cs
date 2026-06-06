@@ -19,6 +19,9 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private readonly AgentRegistryService _agentRegistry;
     private readonly HookServer _hookServer;
     private readonly WindowsOperationMonitor _operationMonitor;
+    private readonly AgentSessionScanner _historyScanner;
+    private readonly INotificationService _notificationService;
+    private AgentSettings _settings = new();
 
     private PendingHookRequest? _selectedPendingRequest;
     private AgentAdapterState? _selectedAgent;
@@ -26,6 +29,9 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private string _questionAnswer = "";
     private string _responseReason = "";
     private string _newProtectedDirectory = "";
+    private string _historyStatusMessage = "";
+    private AgentSessionSummary? _selectedSession;
+    private int _historyDetailCount;
 
     public ObservableCollection<SessionState> Sessions { get; } = [];
     public ObservableCollection<PendingHookRequest> PendingRequests { get; } = [];
@@ -36,8 +42,11 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     public ObservableCollection<string> ProtectedDirectories { get; } = [];
     public ObservableCollection<string> ActiveAgentNames { get; } = [];
     public ObservableCollection<ProcessLifecycleEvent> ProcessEvents { get; } = [];
+    public ObservableCollection<AgentHistoryRecord> HistoryRecords { get; } = [];
+    public ObservableCollection<AgentSessionSummary> HistorySessions { get; } = [];
+    public ObservableCollection<string> HistoryErrors { get; } = [];
 
-    public MainViewModel()
+    public MainViewModel(INotificationService? notificationService = null)
     {
         _paths.EnsureCreated();
         _sessionStore = new SessionStore(_store, _paths);
@@ -47,11 +56,14 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         _agentRegistry = new AgentRegistryService(_paths, _hookInstaller);
         _hookServer = new HookServer(_sessionStore, _auditLog, _guardAnalyzer, _store, _paths);
         _operationMonitor = new WindowsOperationMonitor(_auditLog, _guardAnalyzer, _paths);
+        _historyScanner = new AgentSessionScanner(_paths);
+        _notificationService = notificationService ?? new NullNotificationService();
 
         _sessionStore.Changed += (_, _) => Dispatch(SyncSessions);
         _guardAnalyzer.Changed += (_, _) => Dispatch(SyncGuard);
         _auditLog.Changed += (_, _) => Dispatch(SyncAudit);
         _hookServer.PendingRequestsChanged += (_, _) => Dispatch(SyncPendingRequests);
+        _hookServer.PendingRequestsChanged += (_, _) => Dispatch(NotifyPendingIfNeeded);
         _hookServer.ServerMessage += (_, message) => Dispatch(() => StatusMessage = message);
         _operationMonitor.Changed += (_, _) => Dispatch(SyncMonitor);
 
@@ -69,6 +81,10 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         CancelPlanCommand = new RelayCommand(() => RespondPlanAsync("cancel"), () => SelectedPendingRequest is { Type: PendingRequestType.Plan });
         AddProtectedDirectoryCommand = new RelayCommand(AddProtectedDirectory, () => !string.IsNullOrWhiteSpace(NewProtectedDirectory));
         RefreshAllCommand = new RelayCommand(RefreshAllAsync);
+        ScanAgentHistoryCommand = new RelayCommand(ScanAgentHistoryAsync, () => !IsScanningHistory);
+        ExportAuditCommand = new RelayCommand(ExportAuditAsync);
+        ChooseBridgePathCommand = new RelayCommand(ChooseBridgePath);
+        ToggleNotificationsCommand = new RelayCommand(ToggleNotifications);
     }
 
     public RelayCommand StartServerCommand { get; }
@@ -85,6 +101,10 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     public RelayCommand CancelPlanCommand { get; }
     public RelayCommand AddProtectedDirectoryCommand { get; }
     public RelayCommand RefreshAllCommand { get; }
+    public RelayCommand ScanAgentHistoryCommand { get; }
+    public RelayCommand ExportAuditCommand { get; }
+    public RelayCommand ChooseBridgePathCommand { get; }
+    public RelayCommand ToggleNotificationsCommand { get; }
 
     public PendingHookRequest? SelectedPendingRequest
     {
@@ -110,6 +130,42 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
                 InstallSelectedHooksCommand.RaiseCanExecuteChanged();
             }
         }
+    }
+
+    public AgentSessionSummary? SelectedSession
+    {
+        get => _selectedSession;
+        set
+        {
+            if (SetProperty(ref _selectedSession, value) && value is not null)
+            {
+                FilterHistoryToSession(value);
+            }
+        }
+    }
+
+    public string HistoryStatusMessage
+    {
+        get => _historyStatusMessage;
+        set => SetProperty(ref _historyStatusMessage, value);
+    }
+
+    public AgentSettings Settings
+    {
+        get => _settings;
+        set
+        {
+            if (SetProperty(ref _settings, value))
+            {
+                _notificationService.SetEnabled(value.NotificationsEnabled);
+            }
+        }
+    }
+
+    public int HistoryDetailCount
+    {
+        get => _historyDetailCount;
+        set => SetProperty(ref _historyDetailCount, value);
     }
 
     public string StatusMessage
@@ -144,16 +200,22 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
     public bool IsServerRunning => _hookServer.IsRunning;
     public bool IsMonitoring => _operationMonitor.IsMonitoring;
+    public bool IsScanningHistory { get; private set; }
+    public bool NotificationsEnabled => _notificationService.IsEnabled;
     public int PendingCount => PendingRequests.Count;
     public int ActiveSessionCount => Sessions.Count(item => item.IsActive || item.NeedsAttention);
     public int AuditCount => AuditRecords.Count;
     public int AlertCount => Alerts.Count;
     public int ActiveAgentCount => ActiveAgentNames.Count;
     public int InstalledAgentCount => Agents.Count(item => item.Status is AdapterStatus.Active or AdapterStatus.Installed);
+    public int HistoryRecordCount => HistoryRecords.Count;
+    public int HistorySessionCount => HistorySessions.Count;
 
     public async Task InitializeAsync()
     {
         var startupWarnings = new List<string>();
+        await RunStartupStepAsync("load settings", LoadSettingsAsync, startupWarnings);
+        _notificationService.SetEnabled(Settings.NotificationsEnabled);
         await RunStartupStepAsync("load guard data", _guardAnalyzer.LoadAsync, startupWarnings);
         await RunStartupStepAsync("load sessions", _sessionStore.LoadAsync, startupWarnings);
         await RunStartupStepAsync("load audit log", _auditLog.LoadAsync, startupWarnings);
@@ -181,6 +243,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         await _guardAnalyzer.SaveAsync();
         await _sessionStore.SaveAsync();
         await _auditLog.SaveAsync();
+        await SaveSettingsAsync();
     }
 
     private async Task StartServerAsync()
@@ -227,7 +290,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         }
 
         StatusMessage = AppText.InstallingHooksFor(SelectedAgent.DisplayName);
-        await _agentRegistry.InstallHooksAsync(SelectedAgent.AgentId, BridgeExecutablePath());
+        await _agentRegistry.InstallHooksAsync(SelectedAgent.AgentId, ResolveBridgePath());
         await RefreshAgentsAsync();
         StatusMessage = AppText.HooksUpdatedFor(SelectedAgent.DisplayName);
     }
@@ -235,7 +298,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private async Task InstallAllHooksAsync()
     {
         StatusMessage = AppText.InstallingHooksForAvailableAgents;
-        await _agentRegistry.InstallAllAvailableHooksAsync(BridgeExecutablePath());
+        await _agentRegistry.InstallAllAvailableHooksAsync(ResolveBridgePath());
         await RefreshAgentsAsync();
         StatusMessage = AppText.AgentHookInstallationCompleted;
     }
@@ -313,6 +376,154 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     {
         SyncAll();
         await RefreshAgentsAsync();
+    }
+
+    private async Task ScanAgentHistoryAsync()
+    {
+        if (IsScanningHistory) return;
+        IsScanningHistory = true;
+        ScanAgentHistoryCommand.RaiseCanExecuteChanged();
+        HistoryStatusMessage = AppText.ScanningAgentHistory;
+        try
+        {
+            var result = await _historyScanner.ScanAsync();
+            Replace(HistorySessions, result.Sessions);
+            Replace(HistoryRecords, result.Records);
+            Replace(HistoryErrors, result.Errors);
+            OnPropertyChanged(nameof(HistorySessionCount));
+            OnPropertyChanged(nameof(HistoryRecordCount));
+            OnPropertyChanged(nameof(HistoryDetailCount));
+            HistoryStatusMessage = AppText.AgentHistoryScanCompleted(result.Sessions.Count, result.Records.Count, result.ScannedFileCount);
+            _ = _store.WriteAsync(_paths.HistoryCachePath, result);
+        }
+        catch (Exception ex)
+        {
+            HistoryStatusMessage = AppText.AgentHistoryScanFailed(ex.Message);
+        }
+        finally
+        {
+            IsScanningHistory = false;
+            ScanAgentHistoryCommand.RaiseCanExecuteChanged();
+        }
+    }
+
+    private async Task ExportAuditAsync()
+    {
+        try
+        {
+            var dialog = new Microsoft.Win32.SaveFileDialog
+            {
+                Filter = "CSV (*.csv)|*.csv|JSON (*.json)|*.json",
+                FileName = $"agentguard-audit-{DateTime.Now:yyyyMMdd-HHmmss}.csv",
+                Title = AppText.ExportAuditDialogTitle
+            };
+            if (dialog.ShowDialog() != true) return;
+            var records = _auditLog.Snapshot(5000);
+            await WriteAuditExportAsync(dialog.FileName, records);
+            StatusMessage = AppText.AuditExported(dialog.FileName, records.Count);
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = AppText.AuditExportFailed(ex.Message);
+        }
+    }
+
+    private void ChooseBridgePath()
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Filter = "agentguard-bridge (*.exe)|*.exe|All files (*.*)|*.*",
+            Title = AppText.ChooseBridgePathTitle
+        };
+        if (dialog.ShowDialog() == true)
+        {
+            Settings.BridgePath = dialog.FileName;
+            OnPropertyChanged(nameof(Settings));
+            _ = SaveSettingsAsync();
+        }
+    }
+
+    private void ToggleNotifications()
+    {
+        Settings.NotificationsEnabled = !Settings.NotificationsEnabled;
+        _notificationService.SetEnabled(Settings.NotificationsEnabled);
+        OnPropertyChanged(nameof(Settings));
+        OnPropertyChanged(nameof(NotificationsEnabled));
+        _ = SaveSettingsAsync();
+    }
+
+    private void NotifyPendingIfNeeded()
+    {
+        if (!Settings.NotificationsEnabled) return;
+        var pending = _hookServer.PendingRequests;
+        if (pending.Count == 0) return;
+        var top = pending[0];
+        _notificationService.Show(new NotificationMessage
+        {
+            Kind = NotificationKind.PendingApproval,
+            Title = AppText.NotificationPendingTitle(top.AgentName),
+            Body = $"{top.Title}\n{top.Detail}"
+        });
+    }
+
+    private async Task LoadSettingsAsync()
+    {
+        var loaded = await _store.ReadAsync<AgentSettings>(_paths.SettingsPath) ?? new AgentSettings();
+        Settings = loaded;
+        OnPropertyChanged(nameof(NotificationsEnabled));
+    }
+
+    private Task SaveSettingsAsync() => _store.WriteAsync(_paths.SettingsPath, Settings);
+
+    private void FilterHistoryToSession(AgentSessionSummary session)
+    {
+        var filtered = HistoryRecords.Where(item => item.SourceFile == session.SourceFile).ToList();
+        HistoryDetailCount = filtered.Count;
+    }
+
+    private string? ResolveBridgePath()
+    {
+        if (!string.IsNullOrWhiteSpace(Settings.BridgePath) && File.Exists(Settings.BridgePath))
+        {
+            return Settings.BridgePath;
+        }
+        var path = Path.Combine(AppContext.BaseDirectory, "agentguard-bridge.exe");
+        return File.Exists(path) ? path : null;
+    }
+
+    private static async Task WriteAuditExportAsync(string path, IReadOnlyList<OperationRecord> records)
+    {
+        var ext = Path.GetExtension(path).ToLowerInvariant();
+        if (ext == ".json")
+        {
+            await File.WriteAllTextAsync(path,
+                System.Text.Json.JsonSerializer.Serialize(records, JsonFileStore.Options),
+                System.Text.Encoding.UTF8);
+        }
+        else
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("Timestamp,Agent,Operation,Path,Detail,FileSize,ProcessName");
+            foreach (var r in records)
+            {
+                sb.Append(Csv(r.Timestamp.ToString("O"))).Append(',');
+                sb.Append(Csv(r.AgentName)).Append(',');
+                sb.Append(Csv(r.OperationType.ToString())).Append(',');
+                sb.Append(Csv(r.TargetPath)).Append(',');
+                sb.Append(Csv(r.Detail)).Append(',');
+                sb.Append(r.FileSize).Append(',');
+                sb.AppendLine(Csv(r.ProcessName));
+            }
+            await File.WriteAllTextAsync(path, sb.ToString(), System.Text.Encoding.UTF8);
+        }
+    }
+
+    private static string Csv(string value)
+    {
+        if (string.IsNullOrEmpty(value)) return string.Empty;
+        var needsQuote = value.Contains(',') || value.Contains('"') || value.Contains('\n') || value.Contains('\r');
+        if (!needsQuote) return value;
+        return "\"" + value.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"";
     }
 
     private void SyncAll()
@@ -409,12 +620,6 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         {
             dispatcher.BeginInvoke(action);
         }
-    }
-
-    private static string? BridgeExecutablePath()
-    {
-        var path = Path.Combine(AppContext.BaseDirectory, "agentguard-bridge.exe");
-        return File.Exists(path) ? path : null;
     }
 
     private static async Task RunStartupStepAsync(string name, Func<CancellationToken, Task> action, List<string> warnings)
