@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>agentguard-smoke</AssemblyName>
+    <RootNamespace>AgentGuard.SmokeTest</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\AgentGuard.Core\AgentGuard.Core.csproj" />
+  </ItemGroup>
+</Project>
