@@ -141,7 +141,10 @@ public sealed class GuardAnalyzer
             Pattern = normalized,
             ListType = CommandListType.Unclassified,
             Description = CoreText.DiscoveredCommandDescription,
-            Source = "discovered"
+            Source = "discovered",
+            AutoDiscovered = true,
+            DiscoveredFromAgent = agentName,
+            DiscoveredAt = DateTimeOffset.UtcNow,
         };
         CommandRules.Insert(0, rule);
         IncrementRule(rule, agentName);
@@ -149,6 +152,26 @@ public sealed class GuardAnalyzer
         _ = SaveAsync();
         return new CommandCheckResult { Rule = rule, Message = CoreText.DiscoveredCommandMessage };
     }
+
+    /// <summary>
+    /// v2.1.2 — reclassify a discovered rule into a different list.
+    /// The user explicitly marks it as black/white list, which freezes
+    /// the auto-discovered flag (no more auto-promotion).
+    /// </summary>
+    public bool RecategorizeRule(string ruleId, CommandListType newListType)
+    {
+        var rule = CommandRules.FirstOrDefault(r => r.Id == ruleId);
+        if (rule is null) return false;
+        rule.ListType = newListType;
+        rule.AutoDiscovered = false;
+        Changed?.Invoke(this, EventArgs.Empty);
+        _ = SaveAsync();
+        return true;
+    }
+
+    public IReadOnlyList<CommandRule> CommandRulesByList(CommandListType listType) =>
+        CommandRules.Where(r => r.ListType == listType).ToList();
+
 
     public bool AddProtectedDirectory(string path)
     {
@@ -183,6 +206,44 @@ public sealed class GuardAnalyzer
                 .ToList(),
             Summary = CoreText.AuditReportSummary(scoped.Count, scoped.Select(item => item.AgentName).Distinct().Count())
         };
+    }
+
+    /// <summary>
+    /// v2.1.3 chart layout: aggregate the last <paramref name="hours"/>
+    /// hours of hourly stats. Returns at most <paramref name="hours"/>
+    /// entries, oldest first, with 0-filled gaps.
+    /// </summary>
+    public IReadOnlyList<HourlyStats> RecentHourlyStats(int hours = 24)
+    {
+        var now = DateTimeOffset.Now;
+        var start = new DateTimeOffset(now.Year, now.Month, now.Day, now.Hour, 0, 0, now.Offset)
+            .AddHours(-hours + 1);
+        var byId = HourlyStats.ToDictionary(s => s.Id, s => s);
+        var result = new List<HourlyStats>(hours);
+        for (var i = 0; i < hours; i++)
+        {
+            var hour = start.AddHours(i);
+            var id = hour.ToString("O");
+            result.Add(byId.TryGetValue(id, out var s) ? s : new HourlyStats { Id = id, Hour = hour });
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// v2.1.3 chart layout: top N agents by operation count over a
+    /// recent time window.
+    /// </summary>
+    public IReadOnlyList<(string Agent, int Count)> TopAgents(IReadOnlyList<OperationRecord> records, int top = 5, TimeSpan? window = null)
+    {
+        window ??= TimeSpan.FromHours(24);
+        var cutoff = DateTimeOffset.Now - window.Value;
+        return records
+            .Where(r => r.Timestamp >= cutoff)
+            .GroupBy(r => r.AgentName)
+            .Select(g => (Agent: g.Key, Count: g.Count()))
+            .OrderByDescending(x => x.Count)
+            .Take(top)
+            .ToList();
     }
 
     private void CheckBatchOperation(OperationRecord record)

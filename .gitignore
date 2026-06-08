@@ -5,12 +5,3 @@ artifacts/
 *.suo
 .vs/
 .DS_Store
-
-# Source removed from this repository on the archival commit.
-# These paths are ignored so they don't show as untracked.
-src/
-tools/
-scripts/
-.github/
-AgentGuard.Windows.sln
-Directory.Build.props

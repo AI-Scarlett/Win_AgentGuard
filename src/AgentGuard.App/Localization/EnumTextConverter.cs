@@ -6,17 +6,9 @@ namespace AgentGuard.App.Localization;
 
 public sealed class EnumTextConverter : IValueConverter
 {
-    private static bool IsChinese
-    {
-        get
-        {
-            var overrideLanguage = Environment.GetEnvironmentVariable("AGENTGUARD_LANG");
-            var name = string.IsNullOrWhiteSpace(overrideLanguage)
-                ? CultureInfo.CurrentUICulture.Name
-                : overrideLanguage;
-            return name.StartsWith("zh", StringComparison.OrdinalIgnoreCase);
-        }
-    }
+    private static bool IsChinese => AppText.ActiveLanguage.StartsWith("zh", StringComparison.OrdinalIgnoreCase)
+        || (AppText.ActiveLanguage.Equals("auto", StringComparison.OrdinalIgnoreCase)
+            && CultureInfo.CurrentUICulture.Name.StartsWith("zh", StringComparison.OrdinalIgnoreCase));
 
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {

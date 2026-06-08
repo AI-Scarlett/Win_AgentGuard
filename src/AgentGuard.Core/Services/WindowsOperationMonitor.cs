@@ -12,6 +12,15 @@ public sealed class WindowsOperationMonitor : IDisposable
     private readonly List<FileSystemWatcher> _watchers = [];
     private readonly Dictionary<int, string> _knownAgentProcesses = [];
     private readonly object _gate = new();
+    /// <summary>
+    /// v1.7.3-style ppid-chain cache: maps process id -> the agent that
+    /// ultimately owns the process via the parent chain (max depth 10).
+    /// 15s TTL, capped at 5000 entries.
+    /// </summary>
+    private readonly Dictionary<int, (string Agent, DateTimeOffset CachedAt)> _processTreeCache = [];
+    private const int ProcessTreeCacheTtlSeconds = 15;
+    private const int ProcessTreeCacheMaxEntries = 5000;
+    private const int ProcessTreeMaxDepth = 10;
     private PeriodicTimer? _processTimer;
     private CancellationTokenSource? _cts;
     private Task? _processTask;
@@ -290,6 +299,58 @@ public sealed class WindowsOperationMonitor : IDisposable
         {
             return string.Empty;
         }
+    }
+
+    /// <summary>
+    /// v1.7.3 process-tree attribution. Walks the ppid chain up to
+    /// <see cref="ProcessTreeMaxDepth"/> levels looking for an ancestor whose
+    /// name resolves to a known agent. Results are cached for 15s so
+    /// repeated lookups for hot processes (e.g. node, python spawned by
+    /// Claude Code) stay O(1).
+    /// </summary>
+    public string ResolveAgentViaProcessTree(int pid, IDictionary<int, int> parentMap)
+    {
+        if (pid <= 0) return string.Empty;
+        var now = DateTimeOffset.UtcNow;
+        if (_processTreeCache.TryGetValue(pid, out var cached) &&
+            (now - cached.CachedAt).TotalSeconds < ProcessTreeCacheTtlSeconds)
+        {
+            return cached.Agent;
+        }
+
+        var visited = new HashSet<int> { pid };
+        var current = pid;
+        string? resolved = null;
+        for (var depth = 0; depth < ProcessTreeMaxDepth && current > 0; depth++)
+        {
+            var name = TryGetProcessName(current);
+            if (!string.IsNullOrEmpty(name))
+            {
+                var agent = AgentCatalog.ResolveAgentName(name);
+                if (!string.IsNullOrWhiteSpace(agent))
+                {
+                    resolved = agent;
+                    break;
+                }
+            }
+            if (!parentMap.TryGetValue(current, out var pp) || pp <= 0) break;
+            if (!visited.Add(pp)) break;
+            current = pp;
+        }
+
+        if (_processTreeCache.Count >= ProcessTreeCacheMaxEntries)
+        {
+            // Drop the oldest quarter so we don't grow forever.
+            var doomed = _processTreeCache
+                .OrderBy(kv => kv.Value.CachedAt)
+                .Take(ProcessTreeCacheMaxEntries / 4)
+                .Select(kv => kv.Key)
+                .ToList();
+            foreach (var k in doomed) _processTreeCache.Remove(k);
+        }
+        var agentName = resolved ?? string.Empty;
+        _processTreeCache[pid] = (agentName, now);
+        return agentName;
     }
 
     private void RecordFileEvent(string path, OperationType operationType, string detail)

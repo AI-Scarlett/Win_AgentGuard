@@ -79,6 +79,14 @@ public sealed class CommandRule
     public int TotalCallCount { get; set; }
     public int TodayCallCount { get; set; }
     public string LastCalledBy { get; set; } = "";
+    /// <summary>
+    /// True when the rule was auto-discovered from the audit log
+    /// rather than authored by the user. v2.1.2 (Command guard
+    /// three-category with auto-discovery).
+    /// </summary>
+    public bool AutoDiscovered { get; set; }
+    public string? DiscoveredFromAgent { get; set; }
+    public DateTimeOffset? DiscoveredAt { get; set; }
 
     public static List<CommandRule> DefaultRules() =>
     [

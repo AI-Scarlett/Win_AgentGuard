@@ -45,6 +45,11 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     public ObservableCollection<AgentHistoryRecord> HistoryRecords { get; } = [];
     public ObservableCollection<AgentSessionSummary> HistorySessions { get; } = [];
     public ObservableCollection<string> HistoryErrors { get; } = [];
+    // v2.1.3 chart layout:
+    public ObservableCollection<HourlyStatRow> HourlyStatsView { get; } = [];
+    public ObservableCollection<TopAgentRow> TopAgentsView { get; } = [];
+    // v2.1.1 multi-language dropdown:
+    public ObservableCollection<LanguageChoice> AvailableLanguages { get; } = [];
 
     public MainViewModel(INotificationService? notificationService = null)
     {
@@ -85,6 +90,12 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         ExportAuditCommand = new RelayCommand(ExportAuditAsync);
         ChooseBridgePathCommand = new RelayCommand(ChooseBridgePath);
         ToggleNotificationsCommand = new RelayCommand(ToggleNotifications);
+
+        // v2.1.1 multi-language dropdown
+        foreach (var lang in LanguageChoice.BuildAll())
+        {
+            AvailableLanguages.Add(lang);
+        }
     }
 
     public RelayCommand StartServerCommand { get; }
@@ -470,6 +481,10 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     {
         var loaded = await _store.ReadAsync<AgentSettings>(_paths.SettingsPath) ?? new AgentSettings();
         Settings = loaded;
+        AppText.ActiveLanguage = loaded.Language;
+        _selectedLanguage = AvailableLanguages.FirstOrDefault(l => l.Code == loaded.Language)
+            ?? AvailableLanguages.FirstOrDefault();
+        OnPropertyChanged(nameof(SelectedLanguage));
         OnPropertyChanged(nameof(NotificationsEnabled));
     }
 
@@ -564,6 +579,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     {
         Replace(AuditRecords, _auditLog.Snapshot(500));
         OnPropertyChanged(nameof(AuditCount));
+        RefreshHourlyStatsView();
+        RefreshTopAgentsView();
     }
 
     private void SyncGuard()
@@ -608,6 +625,96 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             collection.Add(value);
         }
     }
+
+    // === v2.1.1 multi-language dropdown ===
+    private LanguageChoice? _selectedLanguage;
+    public LanguageChoice? SelectedLanguage
+    {
+        get => _selectedLanguage;
+        set
+        {
+            if (value is null || _selectedLanguage == value) return;
+            _selectedLanguage = value;
+            OnPropertyChanged();
+            Settings.Language = value.Code;
+            AppText.ActiveLanguage = value.Code;
+            _ = SaveSettingsAsync();
+            // Refresh all on-screen strings bound to x:Static AppText.* by
+            // toggling a refresh marker; for simplicity we just trigger
+            // SyncMonitor/SyncAudit/SyncGuard, which the XAML localizes
+            // via x:Static references that re-evaluate on demand.
+            SyncMonitor();
+            SyncAudit();
+            SyncGuard();
+        }
+    }
+
+    // === v2.1.3 chart layout ===
+    private void RefreshHourlyStatsView()
+    {
+        var stats = _guardAnalyzer.RecentHourlyStats(24);
+        HourlyStatsView.Clear();
+        var max = Math.Max(1, stats.Max(s => s.CreateCount + s.ModifyCount + s.DeleteCount));
+        foreach (var s in stats)
+        {
+            var total = s.CreateCount + s.ModifyCount + s.DeleteCount;
+            var barWidth = (int)Math.Round(total * 24.0 / max);
+            HourlyStatsView.Add(new HourlyStatRow
+            {
+                Label = s.Hour.ToString("HH:mm"),
+                Bar = new string('█', Math.Max(0, barWidth)),
+                CountText = total.ToString(),
+            });
+        }
+    }
+
+    private void RefreshTopAgentsView()
+    {
+        var top = _guardAnalyzer.TopAgents(_auditLog.Snapshot(2000), top: 5);
+        TopAgentsView.Clear();
+        if (top.Count == 0)
+        {
+            TopAgentsView.Add(new TopAgentRow { Agent = AppText.TopAgentsEmpty, Bar = "", CountText = "" });
+            return;
+        }
+        var max = Math.Max(1, top.Max(x => x.Count));
+        foreach (var (agent, count) in top)
+        {
+            var barWidth = (int)Math.Round(count * 24.0 / max);
+            TopAgentsView.Add(new TopAgentRow
+            {
+                Agent = agent,
+                Bar = new string('█', Math.Max(0, barWidth)),
+                CountText = count.ToString(),
+            });
+        }
+    }
+}
+
+public sealed class HourlyStatRow
+{
+    public string Label { get; set; } = "";
+    public string Bar { get; set; } = "";
+    public string CountText { get; set; } = "";
+}
+
+public sealed class TopAgentRow
+{
+    public string Agent { get; set; } = "";
+    public string Bar { get; set; } = "";
+    public string CountText { get; set; } = "";
+}
+
+public sealed class LanguageChoice
+{
+    public string Code { get; init; } = "";
+    public string Display { get; init; } = "";
+
+    public static IReadOnlyList<LanguageChoice> BuildAll() =>
+        AppText.AvailableLanguageCodes
+            .Select(code => new LanguageChoice { Code = code, Display = AppText.LanguageDisplay(code) })
+            .ToList();
+}
 
     private static void Dispatch(Action action)
     {

@@ -335,6 +335,49 @@
                           ToolTip="{x:Static localization:AppText.NotificationsEnabledTip}"
                           Margin="0,16,0,0" />
 
+                <!-- v2.1.1 multi-language dropdown -->
+                <TextBlock Text="{x:Static localization:AppText.LanguageLabel}" FontSize="16" FontWeight="SemiBold" Margin="0,16,0,4" />
+                <ComboBox ItemsSource="{Binding AvailableLanguages}"
+                          SelectedItem="{Binding SelectedLanguage, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                          Width="220" HorizontalAlignment="Left">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                      <TextBlock Text="{Binding Display}" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+
+                <!-- v2.1.3 chart layout: hourly ops + top agents -->
+                <TextBlock Text="{x:Static localization:AppText.HourlyChartTitle}" FontSize="16" FontWeight="SemiBold" Margin="0,24,0,4" />
+                <Border BorderBrush="#E5E7EB" BorderThickness="1" Padding="8" MaxHeight="160">
+                  <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding HourlyStatsView}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                          <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{Binding Label}" Width="60" FontFamily="Consolas" />
+                            <TextBlock Text="{Binding Bar}" FontFamily="Consolas" Foreground="#4F46E5" />
+                            <TextBlock Text="{Binding CountText}" Margin="8,0,0,0" Foreground="#6B7280" FontFamily="Consolas" />
+                          </StackPanel>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </ScrollViewer>
+                </Border>
+
+                <TextBlock Text="{x:Static localization:AppText.TopAgentsTitle}" FontSize="16" FontWeight="SemiBold" Margin="0,16,0,4" />
+                <ItemsControl ItemsSource="{Binding TopAgentsView}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{Binding Agent}" Width="200" />
+                        <TextBlock Text="{Binding Bar}" FontFamily="Consolas" Foreground="#10B981" />
+                        <TextBlock Text="{Binding CountText}" Margin="8,0,0,0" Foreground="#6B7280" />
+                      </StackPanel>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
                 <TextBlock Text="{x:Static localization:AppText.ExportAudit}" FontSize="16" FontWeight="SemiBold" Margin="0,24,0,4" />
                 <Button HorizontalAlignment="Left" Content="{x:Static localization:AppText.ExportAudit}" Command="{Binding ExportAuditCommand}" ToolTip="{x:Static localization:AppText.ExportAuditTip}" />
               </StackPanel>
@@ -352,6 +395,8 @@
                 <DataGrid ItemsSource="{Binding ProcessEvents}" MinHeight="180">
                   <DataGrid.Columns>
                     <DataGridTextColumn Header="{x:Static localization:AppText.Time}" Binding="{Binding Timestamp, StringFormat={}{0:t}}" Width="80" />
+                    <DataGridTextColumn Header="{x:Static localization:AppText.Pid}" Binding="{Binding ProcessId}" Width="60" />
+                    <DataGridTextColumn Header="{x:Static localization:AppText.ParentProcessLabel}" Binding="{Binding ParentProcessId}" Width="70" />
                     <DataGridTextColumn Header="{x:Static localization:AppText.Event}" Binding="{Binding EventType, Converter={StaticResource EnumTextConverter}}" Width="70" />
                     <DataGridTextColumn Header="{x:Static localization:AppText.Agent}" Binding="{Binding AgentName}" Width="120" />
                     <DataGridTextColumn Header="{x:Static localization:AppText.Pid}" Binding="{Binding ProcessId}" Width="70" />

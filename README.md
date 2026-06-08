@@ -1,17 +1,9 @@
 # AgentGuard for Windows
 
-> **Repository archived — source code removed.**
->
-> This repo is kept only as a release pointer. The Windows source tree
-> (`src/`, `tools/`, `scripts/`, `.github/workflows/`, solution file and
-> MSBuild props) has been intentionally removed; the build workflow no
-> longer exists. The git history up to the removal commit is preserved
-> for reference but cannot be used to rebuild the binaries.
->
-> To rebuild from scratch, recover the source from your local working
-> copy or from the last commit before the removal (`60bda58` and earlier).
-
-## Where to get the binary
+Native WPF port of the macOS [AgentGuard](https://github.com/AI-Scarlett/AIMacCleaner)
+feature set. Provides local agent activity monitoring, permission
+approvals, hook server, command rules, protected-folder monitoring, and
+historical agent history scanning.
 
 The Windows installer is published on the unified AgentGuard release:
 
@@ -26,25 +18,34 @@ A portable/extract-anywhere build is **not** distributed to keep the
 debug-symbol surface minimal — the Inno Setup installer above is the
 only Windows binary shipped.
 
-## What AgentGuard for Windows is (was)
-
-AgentGuard for Windows is a native WPF port of the macOS AgentGuard
-feature set. It kept the same product shape:
+## Feature set
 
 - Agent Center with approvals first
-- local hook server for `PermissionRequest`, `AskQuestion`, and
+- Local hook server for `PermissionRequest`, `AskQuestion`, and
   `PlanApproval` events
-- agent integration detection and hook installation
-- session, token, tool, and audit tracking
-- protected-folder monitoring
-- command rules and sensitive-file alerts
-- historical Agent activity scanner (Agent History tab)
+- Agent integration detection and hook installation
+- Session, token, tool, and audit tracking
+- Protected-folder monitoring
+- Command rules and sensitive-file alerts
+- Historical Agent activity scanner (Agent History tab)
 - Windows Action Center toast for new pending approvals
-- configurable bridge path and audit export
-- process tree attribution (parent PID + parent name) on monitored
+- Configurable bridge path and audit export
+- Process tree attribution (parent PID + parent name) on monitored
   launches
 
-## Project docs (preserved here for reference)
+## Building locally
+
+```pwsh
+dotnet build .\AgentGuard.Windows.sln -c Release
+dotnet run --project .\tools\AgentGuard.SmokeTest\AgentGuard.SmokeTest.csproj -c Release
+```
+
+The Windows-only `AgentGuard.App` project requires the .NET 8 SDK on
+Windows. The portable `AgentGuard.Core` and `AgentGuard.HookBridge`
+projects build cross-platform; use the workflow
+`.github/workflows/windows-package.yml` for a full installer build.
+
+## Project docs
 
 - [`docs/AGENT_DATA_FORMATS.md`](docs/AGENT_DATA_FORMATS.md) — research
   notes for Claude / Codex / Cursor / OpenClaw / Hermes session formats,
@@ -53,8 +54,3 @@ feature set. It kept the same product shape:
   audit log.
 - [`docs/PROJECT_REQUIREMENTS.md`](docs/PROJECT_REQUIREMENTS.md) —
   original product requirements.
-
-## License
-
-No license file is shipped. Treat the source as All Rights Reserved by
-the original authors.

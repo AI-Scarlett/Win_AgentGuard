@@ -4,20 +4,78 @@ namespace AgentGuard.App.Localization;
 
 public static class AppText
 {
-    private static bool IsChinese
+    public static event EventHandler? LanguageChanged;
+
+    private static string _activeLanguage = ResolveInitialLanguage();
+
+    public static string ActiveLanguage
     {
-        get
+        get => _activeLanguage;
+        set
         {
-            var overrideLanguage = Environment.GetEnvironmentVariable("AGENTGUARD_LANG");
-            var name = string.IsNullOrWhiteSpace(overrideLanguage)
-                ? CultureInfo.CurrentUICulture.Name
-                : overrideLanguage;
-            return name.StartsWith("zh", StringComparison.OrdinalIgnoreCase);
+            if (string.IsNullOrWhiteSpace(value)) value = "auto";
+            if (_activeLanguage == value) return;
+            _activeLanguage = value;
+            ApplyCulture(value);
+            LanguageChanged?.Invoke(null, EventArgs.Empty);
+        }
+    }
+
+    private static bool IsChinese => ResolveIsChinese(_activeLanguage);
+
+    private static bool ResolveIsChinese(string lang)
+    {
+        if (string.IsNullOrWhiteSpace(lang) || lang.Equals("auto", StringComparison.OrdinalIgnoreCase))
+        {
+            lang = CultureInfo.CurrentUICulture.Name;
+        }
+        return lang.StartsWith("zh", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string ResolveInitialLanguage()
+    {
+        var fromEnv = Environment.GetEnvironmentVariable("AGENTGUARD_LANG");
+        return string.IsNullOrWhiteSpace(fromEnv) ? "auto" : fromEnv;
+    }
+
+    public static void ApplyCulture(string language)
+    {
+        if (string.IsNullOrWhiteSpace(language) || language.Equals("auto", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+        try
+        {
+            var ci = CultureInfo.GetCultureInfo(language);
+            CultureInfo.CurrentCulture = ci;
+            CultureInfo.CurrentUICulture = ci;
+        }
+        catch
+        {
+            // Unknown culture name — keep current culture.
         }
     }
 
     public static string WindowTitle => T("AgentGuard for Windows", "AgentGuard Windows 版");
     public static string ProductName => "AgentGuard";
+
+    // === v2.1.1 multi-language dropdown ===
+    public static string LanguageLabel => T("Language", "语言");
+    public static string LanguageAuto => T("Auto (follow system)", "自动 (跟随系统)");
+    public static string LanguageEnglish => "English";
+    public static string LanguageChinese => "简体中文";
+    public static string LanguageTraditional => "繁體中文";
+
+    public static IReadOnlyList<string> AvailableLanguageCodes { get; } = ["auto", "en", "zh-CN", "zh-TW"];
+
+    public static string LanguageDisplay(string code) => code switch
+    {
+        "auto" => LanguageAuto,
+        "en" => LanguageEnglish,
+        "zh-CN" => LanguageChinese,
+        "zh-TW" => LanguageTraditional,
+        _ => code,
+    };
     public static string Server => T("Server", "服务");
     public static string Monitor => T("Monitor", "监控");
     public static string StartServer => T("Start Server", "启动服务");
@@ -158,6 +216,30 @@ public static class AppText
 
     public static string NotificationPendingTitle(string agentName) =>
         T($"New approval request from {agentName}", $"来自 {agentName} 的新审批请求");
+
+    // === v2.1.2 Command guard three-category UI ===
+    public static string CommandRuleListType_Blacklist => T("Blacklist", "黑名单");
+    public static string CommandRuleListType_Whitelist => T("Whitelist", "白名单");
+    public static string CommandRuleListType_Unclassified => T("Unclassified", "未分类");
+    public static string CommandRuleAutoDiscovered => T("Auto-discovered", "自动发现");
+    public static string CommandRuleMarkAsBlacklist => T("Mark as blacklist", "加入黑名单");
+    public static string CommandRuleMarkAsWhitelist => T("Mark as whitelist", "加入白名单");
+    public static string CommandRuleMoveToUnclassified => T("Move to unclassified", "移入未分类");
+    public static string CommandRuleRecategorizeTip => T("Reclassify this rule into a different list.", "重新分类这条规则到其他列表。");
+    public static string CommandRuleConsequencePrefix => T("Impact: ", "影响：");
+
+    // === v2.1.3 chart layout (process monitor / audit) ===
+    public static string HourlyChartTitle => T("Operations in the last 24h", "过去 24 小时操作量");
+    public static string HourlyChartEmpty => T("No operations recorded yet.", "暂无操作记录。");
+    public static string TopAgentsTitle => T("Top 5 active agents", "活跃度前 5 的 Agent");
+    public static string TopAgentsEmpty => T("No agent activity yet.", "暂无 Agent 活动。");
+    public static string TopAgentRow(string name, int count) =>
+        T($"{name}  —  {count} ops", $"{name}  —  {count} 次");
+    public static string HourlyBar(int count) => new('█', Math.Min(count, 40));
+
+    // === v2.1.3 process monitor — process tree attribution ===
+    public static string ProcessTreeAttributionLabel => T("Process tree", "进程树");
+    public static string ParentProcessLabel => T("Parent", "父进程");
 
     private static string T(string en, string zh) => IsChinese ? zh : en;
 }
