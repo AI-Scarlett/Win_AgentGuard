@@ -689,32 +689,6 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             });
         }
     }
-}
-
-public sealed class HourlyStatRow
-{
-    public string Label { get; set; } = "";
-    public string Bar { get; set; } = "";
-    public string CountText { get; set; } = "";
-}
-
-public sealed class TopAgentRow
-{
-    public string Agent { get; set; } = "";
-    public string Bar { get; set; } = "";
-    public string CountText { get; set; } = "";
-}
-
-public sealed class LanguageChoice
-{
-    public string Code { get; init; } = "";
-    public string Display { get; init; } = "";
-
-    public static IReadOnlyList<LanguageChoice> BuildAll() =>
-        AppText.AvailableLanguageCodes
-            .Select(code => new LanguageChoice { Code = code, Display = AppText.LanguageDisplay(code) })
-            .ToList();
-}
 
     private static void Dispatch(Action action)
     {
@@ -754,4 +728,29 @@ public sealed class LanguageChoice
             warnings.Add($"{name}: {ex.Message}");
         }
     }
+}
+
+public sealed class HourlyStatRow
+{
+    public string Label { get; set; } = "";
+    public string Bar { get; set; } = "";
+    public string CountText { get; set; } = "";
+}
+
+public sealed class TopAgentRow
+{
+    public string Agent { get; set; } = "";
+    public string Bar { get; set; } = "";
+    public string CountText { get; set; } = "";
+}
+
+public sealed class LanguageChoice
+{
+    public string Code { get; init; } = "";
+    public string Display { get; init; } = "";
+
+    public static IReadOnlyList<LanguageChoice> BuildAll() =>
+        AppText.AvailableLanguageCodes
+            .Select(code => new LanguageChoice { Code = code, Display = AppText.LanguageDisplay(code) })
+            .ToList();
 }
