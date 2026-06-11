@@ -5,3 +5,8 @@ artifacts/
 *.suo
 .vs/
 .DS_Store
+
+# Local agent/tooling scratch state; not required for build or runtime.
+.mavis/
+.opencode/
+plans/
