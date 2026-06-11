@@ -32,6 +32,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private string _historyStatusMessage = "";
     private AgentSessionSummary? _selectedSession;
     private int _historyDetailCount;
+    private List<AgentHistoryRecord> _allHistoryRecords = [];
 
     public ObservableCollection<SessionState> Sessions { get; } = [];
     public ObservableCollection<PendingHookRequest> PendingRequests { get; } = [];
@@ -87,6 +88,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         AddProtectedDirectoryCommand = new RelayCommand(AddProtectedDirectory, () => !string.IsNullOrWhiteSpace(NewProtectedDirectory));
         RefreshAllCommand = new RelayCommand(RefreshAllAsync);
         ScanAgentHistoryCommand = new RelayCommand(ScanAgentHistoryAsync, () => !IsScanningHistory);
+        ClearHistoryFilterCommand = new RelayCommand(ClearHistoryFilter);
         ExportAuditCommand = new RelayCommand(ExportAuditAsync);
         ChooseBridgePathCommand = new RelayCommand(ChooseBridgePath);
         ToggleNotificationsCommand = new RelayCommand(ToggleNotifications);
@@ -113,6 +115,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     public RelayCommand AddProtectedDirectoryCommand { get; }
     public RelayCommand RefreshAllCommand { get; }
     public RelayCommand ScanAgentHistoryCommand { get; }
+    public RelayCommand ClearHistoryFilterCommand { get; }
     public RelayCommand ExportAuditCommand { get; }
     public RelayCommand ChooseBridgePathCommand { get; }
     public RelayCommand ToggleNotificationsCommand { get; }
@@ -148,9 +151,16 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         get => _selectedSession;
         set
         {
-            if (SetProperty(ref _selectedSession, value) && value is not null)
+            if (SetProperty(ref _selectedSession, value))
             {
-                FilterHistoryToSession(value);
+                if (value is null)
+                {
+                    ShowAllHistoryRecords();
+                }
+                else
+                {
+                    FilterHistoryToSession(value);
+                }
             }
         }
     }
@@ -212,7 +222,38 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     public bool IsServerRunning => _hookServer.IsRunning;
     public bool IsMonitoring => _operationMonitor.IsMonitoring;
     public bool IsScanningHistory { get; private set; }
-    public bool NotificationsEnabled => _notificationService.IsEnabled;
+    public bool NotificationsEnabled
+    {
+        get => Settings.NotificationsEnabled;
+        set
+        {
+            if (Settings.NotificationsEnabled == value)
+            {
+                return;
+            }
+
+            Settings.NotificationsEnabled = value;
+            _notificationService.SetEnabled(value);
+            OnPropertyChanged();
+            _ = SaveSettingsAsync();
+        }
+    }
+
+    public string BridgePath
+    {
+        get => Settings.BridgePath;
+        set
+        {
+            if (Settings.BridgePath == value)
+            {
+                return;
+            }
+
+            Settings.BridgePath = value;
+            OnPropertyChanged();
+            _ = SaveSettingsAsync();
+        }
+    }
     public int PendingCount => PendingRequests.Count;
     public int ActiveSessionCount => Sessions.Count(item => item.IsActive || item.NeedsAttention);
     public int AuditCount => AuditRecords.Count;
@@ -398,12 +439,13 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         try
         {
             var result = await _historyScanner.ScanAsync();
+            _allHistoryRecords = result.Records;
             Replace(HistorySessions, result.Sessions);
-            Replace(HistoryRecords, result.Records);
+            Replace(HistoryRecords, _allHistoryRecords);
             Replace(HistoryErrors, result.Errors);
             OnPropertyChanged(nameof(HistorySessionCount));
             OnPropertyChanged(nameof(HistoryRecordCount));
-            OnPropertyChanged(nameof(HistoryDetailCount));
+            HistoryDetailCount = _allHistoryRecords.Count;
             HistoryStatusMessage = AppText.AgentHistoryScanCompleted(result.Sessions.Count, result.Records.Count, result.ScannedFileCount);
             _ = _store.WriteAsync(_paths.HistoryCachePath, result);
         }
@@ -448,9 +490,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         };
         if (dialog.ShowDialog() == true)
         {
-            Settings.BridgePath = dialog.FileName;
-            OnPropertyChanged(nameof(Settings));
-            _ = SaveSettingsAsync();
+            BridgePath = dialog.FileName;
         }
     }
 
@@ -486,14 +526,32 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             ?? AvailableLanguages.FirstOrDefault();
         OnPropertyChanged(nameof(SelectedLanguage));
         OnPropertyChanged(nameof(NotificationsEnabled));
+        OnPropertyChanged(nameof(BridgePath));
     }
 
     private Task SaveSettingsAsync() => _store.WriteAsync(_paths.SettingsPath, Settings);
 
     private void FilterHistoryToSession(AgentSessionSummary session)
     {
-        var filtered = HistoryRecords.Where(item => item.SourceFile == session.SourceFile).ToList();
+        var filtered = _allHistoryRecords
+            .Where(item => item.SessionId == session.Id || item.SourceFile == session.SourceFile)
+            .ToList();
+        Replace(HistoryRecords, filtered);
+        OnPropertyChanged(nameof(HistoryRecordCount));
         HistoryDetailCount = filtered.Count;
+    }
+
+    private void ClearHistoryFilter()
+    {
+        SelectedSession = null;
+        ShowAllHistoryRecords();
+    }
+
+    private void ShowAllHistoryRecords()
+    {
+        Replace(HistoryRecords, _allHistoryRecords);
+        OnPropertyChanged(nameof(HistoryRecordCount));
+        HistoryDetailCount = _allHistoryRecords.Count;
     }
 
     private string? ResolveBridgePath()

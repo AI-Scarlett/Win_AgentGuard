@@ -249,7 +249,7 @@
               <TextBlock Text="{x:Static localization:AppText.AgentHistoryTabDescription}" Foreground="#6B7280" />
               <StackPanel Orientation="Horizontal" Margin="0,8,0,8">
                 <Button Content="{x:Static localization:AppText.ScanAgentHistory}" Command="{Binding ScanAgentHistoryCommand}" ToolTip="{x:Static localization:AppText.ScanAgentHistoryTip}" />
-                <Button Content="{x:Static localization:AppText.ClearHistoryFilter}" Command="{Binding ScanAgentHistoryCommand}" ToolTip="{x:Static localization:AppText.ClearHistoryFilterTip}" />
+                <Button Content="{x:Static localization:AppText.ClearHistoryFilter}" Command="{Binding ClearHistoryFilterCommand}" ToolTip="{x:Static localization:AppText.ClearHistoryFilterTip}" />
               </StackPanel>
               <TextBlock Text="{Binding HistoryStatusMessage}" Foreground="#374151" />
               <TextBlock Text="{x:Static localization:AppText.SessionsLabel}" FontWeight="SemiBold" Margin="0,12,0,4" />
@@ -327,11 +327,11 @@
                 <TextBlock Text="{x:Static localization:AppText.BridgePathLabel}" FontSize="16" FontWeight="SemiBold" Margin="0,24,0,4" />
                 <DockPanel>
                   <Button DockPanel.Dock="Right" Content="{x:Static localization:AppText.ChooseBridgePath}" Command="{Binding ChooseBridgePathCommand}" />
-                  <TextBox Text="{Binding Settings.BridgePath, UpdateSourceTrigger=PropertyChanged}" ToolTip="{x:Static localization:AppText.BridgePathTip}" />
+                  <TextBox Text="{Binding BridgePath, UpdateSourceTrigger=PropertyChanged}" ToolTip="{x:Static localization:AppText.BridgePathTip}" />
                 </DockPanel>
 
                 <CheckBox Content="{x:Static localization:AppText.NotificationsEnabledLabel}"
-                          IsChecked="{Binding Settings.NotificationsEnabled}"
+                          IsChecked="{Binding NotificationsEnabled}"
                           ToolTip="{x:Static localization:AppText.NotificationsEnabledTip}"
                           Margin="0,16,0,0" />
 

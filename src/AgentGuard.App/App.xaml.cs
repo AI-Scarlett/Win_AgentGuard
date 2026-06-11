@@ -32,7 +32,7 @@ public partial class App : Application
 
         try
         {
-            Notifications = new WindowsToastNotificationService(new Core.Services.AppPaths());
+            Notifications = new WindowsToastNotificationService(new AppPaths());
         }
         catch (Exception ex)
         {
