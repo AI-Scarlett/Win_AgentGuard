@@ -6,6 +6,7 @@
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <AssemblyName>AgentGuard</AssemblyName>
     <RootNamespace>AgentGuard.App</RootNamespace>
+    <StartupObject>AgentGuard.App.Program</StartupObject>
     <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>

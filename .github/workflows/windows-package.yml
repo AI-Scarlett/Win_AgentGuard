@@ -67,6 +67,10 @@ jobs:
             if (Test-Path $log) {
               Get-Content $log
             }
+            Get-WinEvent -FilterHashtable @{LogName="Application"; StartTime=(Get-Date).AddMinutes(-2)} -ErrorAction SilentlyContinue |
+              Where-Object { $_.ProviderName -in @(".NET Runtime", "Application Error") } |
+              Select-Object -First 10 |
+              Format-List TimeCreated, ProviderName, Id, LevelDisplayName, Message
             throw "Published AgentGuard.exe exited during launch verification with code $($process.ExitCode)."
           }
           $process.Refresh()
