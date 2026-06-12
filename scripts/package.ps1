@@ -35,6 +35,13 @@ try {
     -p:PublishReadyToRun=false `
     -o $appOut
 
+  @("WindowsBase.dll", "PresentationCore.dll", "PresentationFramework.dll") | ForEach-Object {
+    $path = Join-Path $appOut $_
+    if (-not (Test-Path $path)) {
+      throw "WPF runtime dependency missing from publish output: $_"
+    }
+  }
+
   dotnet publish .\src\AgentGuard.HookBridge\AgentGuard.HookBridge.csproj `
     -c $Configuration `
     -r $Runtime `
@@ -44,6 +51,12 @@ try {
     -o $bridgeOut
 
   Copy-Item (Join-Path $bridgeOut "*") $appOut -Recurse -Force
+  @("WindowsBase.dll", "PresentationCore.dll", "PresentationFramework.dll") | ForEach-Object {
+    $path = Join-Path $appOut $_
+    if (-not (Test-Path $path)) {
+      throw "WPF runtime dependency missing after bridge merge: $_"
+    }
+  }
   Compress-Archive -Path (Join-Path $appOut "*") -DestinationPath $packagePath -Force
   Write-Host "Package created: $packagePath"
 

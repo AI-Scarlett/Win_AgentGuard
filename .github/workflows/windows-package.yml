@@ -48,6 +48,12 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path artifacts\publish\AgentGuard | Out-Null
           dotnet publish .\src\AgentGuard.App\AgentGuard.App.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -p:PublishReadyToRun=false -o artifacts\publish\AgentGuard
+          @("WindowsBase.dll", "PresentationCore.dll", "PresentationFramework.dll") | ForEach-Object {
+            $path = Join-Path "artifacts\publish\AgentGuard" $_
+            if (-not (Test-Path $path)) {
+              throw "WPF runtime dependency missing from publish output: $_"
+            }
+          }
 
       - name: Publish bridge
         shell: pwsh
@@ -55,6 +61,12 @@ jobs:
           New-Item -ItemType Directory -Force -Path artifacts\publish\HookBridge | Out-Null
           dotnet publish .\src\AgentGuard.HookBridge\AgentGuard.HookBridge.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -p:PublishReadyToRun=false -o artifacts\publish\HookBridge
           Copy-Item artifacts\publish\HookBridge\* artifacts\publish\AgentGuard -Recurse -Force
+          @("WindowsBase.dll", "PresentationCore.dll", "PresentationFramework.dll") | ForEach-Object {
+            $path = Join-Path "artifacts\publish\AgentGuard" $_
+            if (-not (Test-Path $path)) {
+              throw "WPF runtime dependency missing after bridge merge: $_"
+            }
+          }
 
       - name: Launch packaged app
         shell: pwsh

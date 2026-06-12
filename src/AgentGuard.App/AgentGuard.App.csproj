@@ -1,9 +1,11 @@
-<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <SelfContained>true</SelfContained>
+    <PublishTrimmed>false</PublishTrimmed>
     <AssemblyName>AgentGuard</AssemblyName>
     <RootNamespace>AgentGuard.App</RootNamespace>
     <StartupObject>AgentGuard.App.Program</StartupObject>
