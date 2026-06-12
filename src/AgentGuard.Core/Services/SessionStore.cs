@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Text.Json;
 using AgentGuard.Core.Localization;
 using AgentGuard.Core.Models;
 
@@ -190,6 +191,13 @@ public sealed class SessionStore
                     session.Tokens.CacheRead += ParseUnsigned(payload.String(["cache_read", "cacheRead"]));
                     session.Tokens.CacheCreate += ParseUnsigned(payload.String(["cache_create", "cacheCreate"]));
                     break;
+                case "RateLimitsUpdate":
+                case "rate_limits_update":
+                case "StatusLineUpdate":
+                case "status_line_update":
+                    session.RateLimits = BuildRateLimitInfo(payload);
+                    session.StatusLineText = payload.String(["status_line_text", "statusLineText", "message"]);
+                    break;
                 case "Notification":
                 case "notification":
                     session.Description = payload.String(["message", "notification"]);
@@ -338,6 +346,90 @@ public sealed class SessionStore
 
     private static ulong ParseUnsigned(string value) =>
         ulong.TryParse(value, out var parsed) ? parsed : 0;
+
+    private static double ParseDouble(string value) =>
+        double.TryParse(value, out var parsed) ? parsed : 0;
+
+    private static RateLimitInfo BuildRateLimitInfo(HookPayload payload)
+    {
+        var info = new RateLimitInfo
+        {
+            FiveHourUsage = ParseDouble(payload.String(["five_hour_usage", "fiveHourUsage"])),
+            FiveHourRemaining = payload.String(["five_hour_remaining", "fiveHourRemaining"]),
+            SevenDayUsage = ParseDouble(payload.String(["seven_day_usage", "sevenDayUsage"])),
+            SevenDayRemaining = payload.String(["seven_day_remaining", "sevenDayRemaining"]),
+            Provider = payload.String(["provider"]),
+            Source = payload.Agent,
+            UpdatedAt = DateTimeOffset.Now
+        };
+
+        var raw = payload.String(["rateLimits", "rate_limits"]);
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return info;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(raw);
+            var root = document.RootElement;
+            if (TryObject(root, "primary", out var primary) || TryObject(root, "fiveHour", out primary) || TryObject(root, "five_hour", out primary))
+            {
+                info.FiveHourUsage = ReadDouble(primary, "used_percent", "usedPercent");
+                info.FiveHourRemaining = ReadString(primary, "remaining", "remaining_label", "remainingLabel");
+            }
+
+            if (TryObject(root, "secondary", out var secondary) || TryObject(root, "sevenDay", out secondary) || TryObject(root, "seven_day", out secondary))
+            {
+                info.SevenDayUsage = ReadDouble(secondary, "used_percent", "usedPercent");
+                info.SevenDayRemaining = ReadString(secondary, "remaining", "remaining_label", "remainingLabel");
+            }
+
+            var provider = ReadString(root, "limit_id", "provider", "limit_name");
+            if (!string.IsNullOrWhiteSpace(provider))
+            {
+                info.Provider = provider;
+            }
+        }
+        catch
+        {
+            // Keep top-level fields if a vendor sends a partial/non-JSON value.
+        }
+
+        return info;
+    }
+
+    private static bool TryObject(JsonElement element, string key, out JsonElement value)
+    {
+        value = default;
+        return element.ValueKind == JsonValueKind.Object &&
+               element.TryGetProperty(key, out value) &&
+               value.ValueKind == JsonValueKind.Object;
+    }
+
+    private static double ReadDouble(JsonElement element, params string[] keys)
+    {
+        if (element.ValueKind != JsonValueKind.Object) return 0;
+        foreach (var key in keys)
+        {
+            if (!element.TryGetProperty(key, out var value)) continue;
+            if (value.ValueKind == JsonValueKind.Number && value.TryGetDouble(out var number)) return number;
+            if (value.ValueKind == JsonValueKind.String && double.TryParse(value.GetString(), out var parsed)) return parsed;
+        }
+        return 0;
+    }
+
+    private static string ReadString(JsonElement element, params string[] keys)
+    {
+        if (element.ValueKind != JsonValueKind.Object) return "";
+        foreach (var key in keys)
+        {
+            if (!element.TryGetProperty(key, out var value)) continue;
+            if (value.ValueKind == JsonValueKind.String) return value.GetString() ?? "";
+            if (value.ValueKind == JsonValueKind.Number) return value.GetRawText();
+        }
+        return "";
+    }
 
     private static bool IsApprovalEvent(string eventName) =>
         eventName is "PermissionRequest" or "permission_request" or

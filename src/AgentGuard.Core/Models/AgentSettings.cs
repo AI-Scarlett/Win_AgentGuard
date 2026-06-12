@@ -11,4 +11,12 @@ public sealed class AgentSettings
     /// UI language code: "auto" (follow OS), "en", "zh-CN", "zh-TW".
     /// </summary>
     public string Language { get; set; } = "auto";
+    /// <summary>
+    /// Color palette: "porcelain", "aurora", "rose", "shield".
+    /// </summary>
+    public string ColorPalette { get; set; } = "porcelain";
+    /// <summary>
+    /// Appearance mode: "system", "light", "dark".
+    /// </summary>
+    public string AppearanceMode { get; set; } = "system";
 }

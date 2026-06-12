@@ -3,6 +3,7 @@ using System.IO;
 using System.Windows;
 using AgentGuard.App.Diagnostics;
 using AgentGuard.App.Localization;
+using AgentGuard.App.Services;
 using AgentGuard.Core.Models;
 using AgentGuard.Core.Services;
 
@@ -33,6 +34,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private AgentSessionSummary? _selectedSession;
     private int _historyDetailCount;
     private List<AgentHistoryRecord> _allHistoryRecords = [];
+    private AgentSessionScanResult? _lastHistoryScanResult;
+    private AgentMonitorOverview _monitorOverview = new();
 
     public ObservableCollection<SessionState> Sessions { get; } = [];
     public ObservableCollection<PendingHookRequest> PendingRequests { get; } = [];
@@ -46,11 +49,14 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     public ObservableCollection<AgentHistoryRecord> HistoryRecords { get; } = [];
     public ObservableCollection<AgentSessionSummary> HistorySessions { get; } = [];
     public ObservableCollection<string> HistoryErrors { get; } = [];
+    public ObservableCollection<AgentMonitorOverviewRow> MonitorOverviewRows { get; } = [];
     // v2.1.3 chart layout:
     public ObservableCollection<HourlyStatRow> HourlyStatsView { get; } = [];
     public ObservableCollection<TopAgentRow> TopAgentsView { get; } = [];
     // v2.1.1 multi-language dropdown:
     public ObservableCollection<LanguageChoice> AvailableLanguages { get; } = [];
+    public ObservableCollection<AppThemeService.ThemeChoice> AvailableThemes { get; } = [];
+    public ObservableCollection<AppThemeService.AppearanceChoice> AvailableAppearances { get; } = [];
 
     public MainViewModel(INotificationService? notificationService = null)
     {
@@ -97,6 +103,14 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         foreach (var lang in LanguageChoice.BuildAll())
         {
             AvailableLanguages.Add(lang);
+        }
+        foreach (var theme in AppThemeService.Palettes)
+        {
+            AvailableThemes.Add(theme);
+        }
+        foreach (var appearance in AppThemeService.Appearances)
+        {
+            AvailableAppearances.Add(appearance);
         }
     }
 
@@ -262,6 +276,20 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     public int InstalledAgentCount => Agents.Count(item => item.Status is AdapterStatus.Active or AdapterStatus.Installed);
     public int HistoryRecordCount => HistoryRecords.Count;
     public int HistorySessionCount => HistorySessions.Count;
+    public int MonitorOverviewRowCount => MonitorOverviewRows.Count;
+    public string MonitorOverviewTotalTokens => FormatTokens(_monitorOverview.TotalTokens);
+    public string MonitorOverviewAverageContext => _monitorOverview.AverageContextPercent > 0
+        ? $"{_monitorOverview.AverageContextPercent:0.#}%"
+        : "0%";
+    public string MonitorOverviewRateLimit => string.IsNullOrWhiteSpace(_monitorOverview.RateLimitSummary)
+        ? AppText.NoRateLimitData
+        : _monitorOverview.RateLimitSummary;
+    public int MonitorOverviewToolCalls => _monitorOverview.ToolCallCount;
+    public int MonitorOverviewCommands => _monitorOverview.CommandCount;
+    public int MonitorOverviewFileAccesses => _monitorOverview.FileAccessCount;
+    public string MonitorOverviewStatusMessage => _monitorOverview.Rows.Count == 0
+        ? AppText.MonitorOverviewNoData
+        : AppText.MonitorOverviewLoaded(_monitorOverview.Rows.Count, _monitorOverview.HistoricalSessionCount);
 
     public async Task InitializeAsync()
     {
@@ -275,6 +303,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         SyncSessions();
         SyncAudit();
         SyncPendingRequests();
+        await RunStartupStepAsync("load history cache", LoadHistoryCacheAsync, startupWarnings);
         await RunStartupStepAsync("refresh agents", RefreshAgentsAsync, startupWarnings);
         await RunStartupStepAsync("start hook server", StartServerAsync, startupWarnings);
         await RunStartupStepAsync("start Windows monitor", StartMonitoring, startupWarnings);
@@ -439,6 +468,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         try
         {
             var result = await _historyScanner.ScanAsync();
+            _lastHistoryScanResult = result;
             _allHistoryRecords = result.Records;
             Replace(HistorySessions, result.Sessions);
             Replace(HistoryRecords, _allHistoryRecords);
@@ -447,6 +477,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             OnPropertyChanged(nameof(HistoryRecordCount));
             HistoryDetailCount = _allHistoryRecords.Count;
             HistoryStatusMessage = AppText.AgentHistoryScanCompleted(result.Sessions.Count, result.Records.Count, result.ScannedFileCount);
+            RefreshMonitorOverview();
             _ = _store.WriteAsync(_paths.HistoryCachePath, result);
         }
         catch (Exception ex)
@@ -524,12 +555,40 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         AppText.ActiveLanguage = loaded.Language;
         _selectedLanguage = AvailableLanguages.FirstOrDefault(l => l.Code == loaded.Language)
             ?? AvailableLanguages.FirstOrDefault();
+        _selectedTheme = AvailableThemes.FirstOrDefault(item => item.Code == loaded.ColorPalette)
+            ?? AvailableThemes.FirstOrDefault();
+        _selectedAppearance = AvailableAppearances.FirstOrDefault(item => item.Code == loaded.AppearanceMode)
+            ?? AvailableAppearances.FirstOrDefault();
+        AppThemeService.Apply(loaded.ColorPalette, loaded.AppearanceMode);
         OnPropertyChanged(nameof(SelectedLanguage));
+        OnPropertyChanged(nameof(SelectedTheme));
+        OnPropertyChanged(nameof(SelectedAppearance));
         OnPropertyChanged(nameof(NotificationsEnabled));
         OnPropertyChanged(nameof(BridgePath));
     }
 
     private Task SaveSettingsAsync() => _store.WriteAsync(_paths.SettingsPath, Settings);
+
+    private async Task LoadHistoryCacheAsync()
+    {
+        var cached = await _store.ReadAsync<AgentSessionScanResult>(_paths.HistoryCachePath);
+        if (cached is null)
+        {
+            RefreshMonitorOverview();
+            return;
+        }
+
+        _lastHistoryScanResult = cached;
+        _allHistoryRecords = cached.Records;
+        Replace(HistorySessions, cached.Sessions);
+        Replace(HistoryRecords, _allHistoryRecords);
+        Replace(HistoryErrors, cached.Errors);
+        OnPropertyChanged(nameof(HistorySessionCount));
+        OnPropertyChanged(nameof(HistoryRecordCount));
+        HistoryDetailCount = _allHistoryRecords.Count;
+        HistoryStatusMessage = AppText.AgentHistoryCacheLoaded(cached.Sessions.Count, cached.Records.Count);
+        RefreshMonitorOverview();
+    }
 
     private void FilterHistoryToSession(AgentSessionSummary session)
     {
@@ -612,6 +671,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     {
         Replace(Sessions, _sessionStore.Snapshot());
         OnPropertyChanged(nameof(ActiveSessionCount));
+        RefreshMonitorOverview();
     }
 
     private void SyncPendingRequests()
@@ -639,6 +699,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         OnPropertyChanged(nameof(AuditCount));
         RefreshHourlyStatsView();
         RefreshTopAgentsView();
+        RefreshMonitorOverview();
     }
 
     private void SyncGuard()
@@ -686,6 +747,37 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
     // === v2.1.1 multi-language dropdown ===
     private LanguageChoice? _selectedLanguage;
+    private AppThemeService.ThemeChoice? _selectedTheme;
+    private AppThemeService.AppearanceChoice? _selectedAppearance;
+
+    public AppThemeService.ThemeChoice? SelectedTheme
+    {
+        get => _selectedTheme;
+        set
+        {
+            if (value is null || _selectedTheme == value) return;
+            _selectedTheme = value;
+            OnPropertyChanged();
+            Settings.ColorPalette = value.Code;
+            AppThemeService.Apply(Settings.ColorPalette, Settings.AppearanceMode);
+            _ = SaveSettingsAsync();
+        }
+    }
+
+    public AppThemeService.AppearanceChoice? SelectedAppearance
+    {
+        get => _selectedAppearance;
+        set
+        {
+            if (value is null || _selectedAppearance == value) return;
+            _selectedAppearance = value;
+            OnPropertyChanged();
+            Settings.AppearanceMode = value.Code;
+            AppThemeService.Apply(Settings.ColorPalette, Settings.AppearanceMode);
+            _ = SaveSettingsAsync();
+        }
+    }
+
     public LanguageChoice? SelectedLanguage
     {
         get => _selectedLanguage;
@@ -746,6 +838,31 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
                 CountText = count.ToString(),
             });
         }
+    }
+
+    private void RefreshMonitorOverview()
+    {
+        _monitorOverview = AgentMonitorOverviewService.Build(
+            _lastHistoryScanResult,
+            _sessionStore.Snapshot(),
+            _auditLog.Snapshot(2000));
+        Replace(MonitorOverviewRows, _monitorOverview.Rows);
+        OnPropertyChanged(nameof(MonitorOverviewRowCount));
+        OnPropertyChanged(nameof(MonitorOverviewTotalTokens));
+        OnPropertyChanged(nameof(MonitorOverviewAverageContext));
+        OnPropertyChanged(nameof(MonitorOverviewRateLimit));
+        OnPropertyChanged(nameof(MonitorOverviewToolCalls));
+        OnPropertyChanged(nameof(MonitorOverviewCommands));
+        OnPropertyChanged(nameof(MonitorOverviewFileAccesses));
+        OnPropertyChanged(nameof(MonitorOverviewStatusMessage));
+    }
+
+    private static string FormatTokens(ulong value)
+    {
+        if (value >= 1_000_000_000) return $"{value / 1_000_000_000.0:0.##}B";
+        if (value >= 1_000_000) return $"{value / 1_000_000.0:0.##}M";
+        if (value >= 1_000) return $"{value / 1_000.0:0.#}K";
+        return value.ToString();
     }
 
     private static void Dispatch(Action action)

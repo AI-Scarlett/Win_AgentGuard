@@ -266,7 +266,15 @@ public sealed class AgentSessionScanner
                 if (!string.IsNullOrEmpty(payloadCwd)) _ctx.CwdByFile[file] = payloadCwd;
                 var model = ReadString(payload, "model") ?? ReadString(payload, "model_provider") ?? "";
                 if (!string.IsNullOrEmpty(model)) _ctx.ModelByFile[file] = model;
+                var metaSessionId = ReadString(payload, "id") ?? ReadString(payload, "session_id") ?? ReadString(payload, "sessionId");
+                if (!string.IsNullOrEmpty(metaSessionId)) _ctx.SessionIdByFile[file] = metaSessionId;
             }
+            return;
+        }
+
+        if (type == "event_msg")
+        {
+            ParseCodexEventMessage(root, file, result);
             return;
         }
 
@@ -285,6 +293,108 @@ public sealed class AgentSessionScanner
             var input = TryParseJsonElement(argsRaw);
             AppendRecord(result, "Codex", sessionId, file, ts, name, input, cwd, project);
         }
+    }
+
+    private void ParseCodexEventMessage(JsonElement root, string file, AgentSessionScanResult result)
+    {
+        if (!root.TryGetProperty("payload", out var payload) || payload.ValueKind != JsonValueKind.Object)
+        {
+            return;
+        }
+
+        var payloadType = ReadString(payload, "type") ?? "";
+        if (!payloadType.Equals("token_count", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        if (!TryGetObject(payload, "info", out var info))
+        {
+            info = payload;
+        }
+
+        var totalUsage = TryGetObject(info, "total_token_usage", out var totalNode)
+            ? TokenUsageValues.Read(totalNode)
+            : TokenUsageValues.Empty;
+        var lastUsage = TryGetObject(info, "last_token_usage", out var lastNode)
+            ? TokenUsageValues.Read(lastNode)
+            : TokenUsageValues.Empty;
+
+        var delta = TokenUsageValues.Empty;
+        if (totalUsage.TotalOrSum > 0 &&
+            _ctx.LastTotalUsageByFile.TryGetValue(file, out var previous) &&
+            totalUsage.TotalOrSum >= previous.TotalOrSum)
+        {
+            delta = totalUsage.Minus(previous);
+        }
+        else if (lastUsage.TotalOrSum > 0)
+        {
+            delta = lastUsage;
+        }
+        else if (totalUsage.TotalOrSum > 0 && !_ctx.LastTotalUsageByFile.ContainsKey(file))
+        {
+            delta = totalUsage;
+        }
+
+        if (totalUsage.TotalOrSum > 0)
+        {
+            _ctx.LastTotalUsageByFile[file] = totalUsage;
+        }
+
+        if (delta.TotalOrSum == 0)
+        {
+            return;
+        }
+
+        var ts = ReadTimestamp(root);
+        var sessionId = _ctx.SessionIdByFile.TryGetValue(file, out var sid) ? sid : Path.GetFileNameWithoutExtension(file);
+        var cwd = _ctx.CwdByFile.TryGetValue(file, out var cachedCwd) ? cachedCwd : "";
+        var model = _ctx.ModelByFile.TryGetValue(file, out var cachedModel) ? cachedModel : "";
+        var contextWindow = ReadUnsigned(info, "model_context_window", "context_window", "contextWindow", "context_window_size", "contextWindowSize");
+        var cumulativeTotal = totalUsage.TotalOrSum > 0 ? totalUsage : delta;
+        var contextUsed = contextWindow > 0
+            ? Math.Round(cumulativeTotal.TotalOrSum * 100.0 / contextWindow, 1)
+            : 0;
+
+        var rateLimits = payload.TryGetProperty("rate_limits", out var rateNode) && rateNode.ValueKind == JsonValueKind.Object
+            ? rateNode
+            : (payload.TryGetProperty("rateLimits", out rateNode) && rateNode.ValueKind == JsonValueKind.Object ? rateNode : default);
+        var primary = TryGetObject(rateLimits, "primary", out var primaryNode)
+            ? primaryNode
+            : (TryGetObject(rateLimits, "fiveHour", out primaryNode) ? primaryNode : default);
+        var secondary = TryGetObject(rateLimits, "secondary", out var secondaryNode)
+            ? secondaryNode
+            : (TryGetObject(rateLimits, "sevenDay", out secondaryNode) ? secondaryNode : default);
+
+        result.TokenUsage.Add(new AgentTokenUsageRecord
+        {
+            Id = $"codex-token:{sessionId}:{ts.UtcTicks}:{delta.TotalOrSum}:{Guid.NewGuid():N}",
+            Timestamp = ts,
+            AgentName = "Codex",
+            SessionId = sessionId,
+            Project = ExtractProjectName(cwd),
+            Cwd = cwd,
+            Model = model,
+            SourceFile = file,
+            InputTokens = delta.Input,
+            OutputTokens = delta.Output,
+            CachedInputTokens = delta.CachedInput,
+            CacheCreationTokens = delta.CacheCreation,
+            ReasoningTokens = delta.Reasoning,
+            TotalTokens = delta.TotalOrSum,
+            CumulativeInputTokens = cumulativeTotal.Input,
+            CumulativeOutputTokens = cumulativeTotal.Output,
+            CumulativeCachedInputTokens = cumulativeTotal.CachedInput,
+            CumulativeReasoningTokens = cumulativeTotal.Reasoning,
+            CumulativeTotalTokens = cumulativeTotal.TotalOrSum,
+            ContextWindow = contextWindow,
+            ContextUsedPercent = contextUsed,
+            FiveHourUsagePercent = ReadDouble(primary, "used_percent", "usedPercent"),
+            FiveHourRemaining = ReadString(primary, "remaining") ?? ReadResetLabel(primary),
+            SevenDayUsagePercent = ReadDouble(secondary, "used_percent", "usedPercent"),
+            SevenDayRemaining = ReadString(secondary, "remaining") ?? ReadResetLabel(secondary),
+            PlanType = ReadString(rateLimits, "plan_type") ?? ReadString(rateLimits, "planType") ?? ""
+        });
     }
 
     private void ParseCodexStateDb(string path, AgentSessionScanResult result)
@@ -329,6 +439,7 @@ public sealed class AgentSessionScanner
                     SourceFile = path,
                     Cwd = cwd,
                     Project = ExtractProjectName(cwd),
+                    Model = modelProvider,
                     StartedAt = ts,
                     LastActivity = ts,
                     RecordCount = 0,
@@ -1179,8 +1290,9 @@ public sealed class AgentSessionScanner
         if (string.IsNullOrWhiteSpace(cwd)) return string.Empty;
         try
         {
-            var trimmed = cwd!.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            return Path.GetFileName(trimmed);
+            var trimmed = cwd!.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar, '\\', '/');
+            var parts = trimmed.Split(new[] { '\\', '/' }, StringSplitOptions.RemoveEmptyEntries);
+            return parts.Length == 0 ? string.Empty : parts[^1];
         }
         catch
         {
@@ -1212,6 +1324,7 @@ public sealed class AgentSessionScanner
 
     private static string? ReadString(JsonElement element, string key)
     {
+        if (element.ValueKind != JsonValueKind.Object) return null;
         if (element.TryGetProperty(key, out var v) && v.ValueKind == JsonValueKind.String)
         {
             return v.GetString();
@@ -1221,6 +1334,7 @@ public sealed class AgentSessionScanner
 
     private static long ReadLong(JsonElement element, string key)
     {
+        if (element.ValueKind != JsonValueKind.Object) return 0;
         if (element.TryGetProperty(key, out var v))
         {
             if (v.ValueKind == JsonValueKind.Number && v.TryGetInt64(out var n)) return n;
@@ -1332,5 +1446,88 @@ public sealed class AgentSessionScanner
         public Dictionary<string, string> CwdByFile { get; } = new(StringComparer.OrdinalIgnoreCase);
         public Dictionary<string, string> SessionIdByFile { get; } = new(StringComparer.OrdinalIgnoreCase);
         public Dictionary<string, string> ModelByFile { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, TokenUsageValues> LastTotalUsageByFile { get; } = new(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private readonly record struct TokenUsageValues(
+        ulong Input,
+        ulong Output,
+        ulong CachedInput,
+        ulong CacheCreation,
+        ulong Reasoning,
+        ulong Total)
+    {
+        public static TokenUsageValues Empty => new(0, 0, 0, 0, 0, 0);
+
+        public ulong TotalOrSum => Total > 0
+            ? Total
+            : Input + Output + CacheCreation + Reasoning;
+
+        public TokenUsageValues Minus(TokenUsageValues previous) =>
+            new(
+                Subtract(Input, previous.Input),
+                Subtract(Output, previous.Output),
+                Subtract(CachedInput, previous.CachedInput),
+                Subtract(CacheCreation, previous.CacheCreation),
+                Subtract(Reasoning, previous.Reasoning),
+                Subtract(Total, previous.Total));
+
+        public static TokenUsageValues Read(JsonElement element) =>
+            new(
+                ReadUnsigned(element, "input_tokens", "inputTokens", "prompt_tokens", "promptTokens"),
+                ReadUnsigned(element, "output_tokens", "outputTokens", "completion_tokens", "completionTokens"),
+                ReadUnsigned(element, "cached_input_tokens", "cachedInputTokens", "cache_read", "cacheRead", "cache_read_tokens", "cacheReadTokens"),
+                ReadUnsigned(element, "cache_creation_input_tokens", "cacheCreationInputTokens", "cache_create", "cacheCreate", "cache_write_tokens", "cacheWriteTokens"),
+                ReadUnsigned(element, "reasoning_output_tokens", "reasoningOutputTokens", "reasoning_tokens", "reasoningTokens"),
+                ReadUnsigned(element, "total_tokens", "totalTokens"));
+
+        private static ulong Subtract(ulong value, ulong previous) => value >= previous ? value - previous : value;
+    }
+
+    private static bool TryGetObject(JsonElement element, string key, out JsonElement value)
+    {
+        value = default;
+        return element.ValueKind == JsonValueKind.Object &&
+               element.TryGetProperty(key, out value) &&
+               value.ValueKind == JsonValueKind.Object;
+    }
+
+    private static ulong ReadUnsigned(JsonElement element, params string[] keys)
+    {
+        if (element.ValueKind != JsonValueKind.Object) return 0;
+        foreach (var key in keys)
+        {
+            if (!element.TryGetProperty(key, out var value)) continue;
+            if (value.ValueKind == JsonValueKind.Number && value.TryGetUInt64(out var n)) return n;
+            if (value.ValueKind == JsonValueKind.String && ulong.TryParse(value.GetString(), out var parsed)) return parsed;
+        }
+        return 0;
+    }
+
+    private static double ReadDouble(JsonElement element, params string[] keys)
+    {
+        if (element.ValueKind != JsonValueKind.Object) return 0;
+        foreach (var key in keys)
+        {
+            if (!element.TryGetProperty(key, out var value)) continue;
+            if (value.ValueKind == JsonValueKind.Number && value.TryGetDouble(out var n)) return n;
+            if (value.ValueKind == JsonValueKind.String && double.TryParse(value.GetString(), out var parsed)) return parsed;
+        }
+        return 0;
+    }
+
+    private static string ReadResetLabel(JsonElement element)
+    {
+        if (element.ValueKind != JsonValueKind.Object) return "";
+        var resetSeconds = ReadUnsigned(element, "resets_at", "resetsAt");
+        if (resetSeconds == 0) return "";
+        try
+        {
+            return DateTimeOffset.FromUnixTimeSeconds((long)resetSeconds).LocalDateTime.ToString("g");
+        }
+        catch
+        {
+            return "";
+        }
     }
 }

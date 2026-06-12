@@ -21,10 +21,14 @@ only Windows binary shipped.
 ## Feature set
 
 - Agent Center with approvals first
+- Command-center shell with left navigation, fixed icon slots,
+  selection rail, themed surfaces, and compact operational status
+- Agent Monitor overview with abtop-style session, context, token,
+  tool, command, file-access, and rate-limit signals
 - Local hook server for `PermissionRequest`, `AskQuestion`, and
   `PlanApproval` events
 - Agent integration detection and hook installation
-- Session, token, tool, and audit tracking
+- Session, TokenScope, tool, and audit tracking
 - Protected-folder monitoring
 - Command rules and sensitive-file alerts
 - Historical Agent activity scanner (Agent History tab)
@@ -32,6 +36,11 @@ only Windows binary shipped.
 - Configurable bridge path and audit export
 - Process tree attribution (parent PID + parent name) on monitored
   launches
+- Cached Agent History loading so the overview is populated at startup
+  after the first scan
+- Four color themes matching the macOS redesign: Default White,
+  Aurora Cyan, Rose Signal, and Blue Shield
+- System, light, and dark appearance modes with persisted selection
 
 ## Building locally
 

@@ -88,6 +88,18 @@ try
         throw new InvalidOperationException("Hook response JSON must stay single-line.");
     }
 
+    var settingsPath = Path.Combine(tempRoot, "theme-settings.json");
+    await store.WriteAsync(settingsPath, new AgentSettings
+    {
+        ColorPalette = "aurora",
+        AppearanceMode = "dark"
+    });
+    var themeSettings = await store.ReadAsync<AgentSettings>(settingsPath);
+    if (themeSettings?.ColorPalette != "aurora" || themeSettings.AppearanceMode != "dark")
+    {
+        throw new InvalidOperationException("Theme settings persistence failed.");
+    }
+
     var yamlPath = Path.Combine(tempRoot, "agent.yaml");
     await store.WriteTextAsync(yamlPath, """
     keep: true
@@ -206,6 +218,8 @@ static async Task CodexSmoke(string tempRoot, string profile)
     {
         """{"type":"session_meta","timestamp":"2026-05-10T10:00:00Z","payload":{"cwd":"C:\\Users\\smoke\\CodexProj","model":"gpt-5-codex","model_provider":"openai"}}""",
         """{"type":"turn_context","timestamp":"2026-05-10T10:00:05Z","payload":{"cwd":"C:\\Users\\smoke\\CodexProj","model":"gpt-5-codex"}}""",
+        """{"type":"event_msg","timestamp":"2026-05-10T10:00:06Z","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":1000,"cached_input_tokens":400,"output_tokens":100,"reasoning_output_tokens":20,"total_tokens":1100},"last_token_usage":{"input_tokens":1000,"cached_input_tokens":400,"output_tokens":100,"reasoning_output_tokens":20,"total_tokens":1100},"model_context_window":100000},"rate_limits":{"primary":{"used_percent":12.5,"window_minutes":300},"secondary":{"used_percent":2.0,"window_minutes":10080},"plan_type":"plus"}}}""",
+        """{"type":"event_msg","timestamp":"2026-05-10T10:00:07Z","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":1500,"cached_input_tokens":700,"output_tokens":150,"reasoning_output_tokens":40,"total_tokens":1650},"last_token_usage":{"input_tokens":500,"cached_input_tokens":300,"output_tokens":50,"reasoning_output_tokens":20,"total_tokens":550},"model_context_window":100000},"rate_limits":{"primary":{"used_percent":13.0,"window_minutes":300},"secondary":{"used_percent":2.0,"window_minutes":10080},"plan_type":"plus"}}}""",
         """{"type":"response_item","timestamp":"2026-05-10T10:00:10Z","payload":{"type":"function_call","name":"write_file","arguments":"{\"file_path\":\"C:\\\\Users\\\\smoke\\\\CodexProj\\\\main.go\",\"content\":\"package main\"}","call_id":"call_1"}}""",
         """{"type":"response_item","timestamp":"2026-05-10T10:00:30Z","payload":{"type":"custom_tool_call","name":"shell","arguments":"{\"command\":\"go run main.go\"}","call_id":"call_2"}}""",
         """{"type":"response_item","timestamp":"2026-05-10T10:01:00Z","payload":{"type":"message","role":"assistant","content":[{"type":"text","text":"done"}]}}"""
@@ -253,6 +267,19 @@ static async Task CodexSmoke(string tempRoot, string profile)
     if (session is null || !session.Cwd.Contains("CodexProj", StringComparison.OrdinalIgnoreCase))
     {
         throw new InvalidOperationException("Codex: SQLite session metadata not picked up.");
+    }
+    var tokenTotal = result.TokenUsage.Where(r => r.AgentName == "Codex").Aggregate(0UL, (sum, item) => sum + item.TotalTokens);
+    if (tokenTotal != 1650)
+    {
+        throw new InvalidOperationException($"Codex: expected token delta total 1650, got {tokenTotal}.");
+    }
+    var latestToken = result.TokenUsage.OrderByDescending(r => r.Timestamp).FirstOrDefault();
+    if (latestToken is null ||
+        latestToken.ContextWindow != 100000 ||
+        latestToken.ContextUsedPercent <= 0 ||
+        Math.Abs(latestToken.FiveHourUsagePercent - 13.0) > 0.01)
+    {
+        throw new InvalidOperationException("Codex: token context/rate-limit metadata not picked up.");
     }
 
     await Task.CompletedTask;

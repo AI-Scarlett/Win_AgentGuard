@@ -12,6 +12,7 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         AppDiagnostics.Log("AgentGuard starting.");
+        AppThemeService.Apply("porcelain", "system");
         AppDomain.CurrentDomain.UnhandledException += (_, args) =>
             AppDiagnostics.Log("Unhandled app-domain exception.", args.ExceptionObject as Exception);
         TaskScheduler.UnobservedTaskException += (_, args) =>

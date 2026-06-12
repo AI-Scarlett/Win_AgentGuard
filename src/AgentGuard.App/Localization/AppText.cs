@@ -65,6 +65,12 @@ public static class AppText
     public static string LanguageEnglish => "English";
     public static string LanguageChinese => "简体中文";
     public static string LanguageTraditional => "繁體中文";
+    public static string Appearance => T("Appearance", "外观");
+    public static string ColorTheme => T("Color theme", "主题色彩");
+    public static string ColorThemeDescription =>
+        T("Themes update the complete AgentGuard workspace and adapt to light and dark mode.",
+            "主题会更新整个 AgentGuard 工作台，并适配浅色与深色模式。");
+    public static string AppearanceMode => T("Appearance mode", "外观模式");
 
     public static IReadOnlyList<string> AvailableLanguageCodes { get; } = ["auto", "en", "zh-CN", "zh-TW"];
 
@@ -105,6 +111,26 @@ public static class AppText
     public static string Answer => T("Answer", "回答");
     public static string AcceptPlan => T("Accept Plan", "接受计划");
     public static string CancelPlan => T("Cancel Plan", "取消计划");
+    public static string MonitorOverview => T("Monitor Overview", "监控概览");
+    public static string MonitorOverviewSubtitle =>
+        T("Live sessions plus historical token and tool activity.", "实时会话与历史 token / 工具活动汇总。");
+    public static string TotalTokens => T("Total Tokens", "Token 总量");
+    public static string AvgContext => T("Avg Context", "平均上下文");
+    public static string ToolCalls => T("Tool Calls", "工具调用");
+    public static string Commands => T("Commands", "命令");
+    public static string FileAccesses => T("File Accesses", "文件访问");
+    public static string RateLimit => T("Rate Limit", "额度");
+    public static string NoRateLimitData => T("No rate-limit data", "暂无额度数据");
+    public static string Context => T("Context", "上下文");
+    public static string Model => T("Model", "模型");
+    public static string Tokens => T("Tokens", "Token");
+    public static string Files => T("Files", "文件");
+    public static string MonitorOverviewNoData =>
+        T("No monitor overview yet. Scan Agent History to populate local session and token data.",
+            "暂无监控概览。扫描 Agent 历史后会填充本机会话和 token 数据。");
+    public static string MonitorOverviewLoaded(int rows, int sessions) =>
+        T($"Overview loaded: {rows} rows across {sessions} historical sessions.",
+            $"概览已加载：{rows} 行，覆盖 {sessions} 个历史会话。");
     public static string Audit => T("Audit", "审计");
     public static string Time => T("Time", "时间");
     public static string Target => T("Target", "目标");
@@ -188,6 +214,9 @@ public static class AppText
     public static string AgentHistoryScanCompleted(int sessions, int records, int files) =>
         T($"Scanned {files} files: {sessions} sessions, {records} records.",
             $"扫描了 {files} 个文件：{sessions} 个会话，{records} 条记录。");
+    public static string AgentHistoryCacheLoaded(int sessions, int records) =>
+        T($"Loaded cached history: {sessions} sessions, {records} records.",
+            $"已加载历史缓存：{sessions} 个会话，{records} 条记录。");
     public static string AgentHistoryScanFailed(string message) =>
         T($"Agent history scan failed: {message}", $"Agent 历史扫描失败：{message}");
     public static string AgentHistoryTabDescription =>
