@@ -59,13 +59,18 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path artifacts\publish\HookBridge | Out-Null
+          $wpfHashBefore = (Get-FileHash artifacts\publish\AgentGuard\WindowsBase.dll -Algorithm SHA256).Hash
           dotnet publish .\src\AgentGuard.HookBridge\AgentGuard.HookBridge.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -p:PublishReadyToRun=false -o artifacts\publish\HookBridge
-          Copy-Item artifacts\publish\HookBridge\* artifacts\publish\AgentGuard -Recurse -Force
+          Copy-Item artifacts\publish\HookBridge\agentguard-bridge.* artifacts\publish\AgentGuard -Force
           @("WindowsBase.dll", "PresentationCore.dll", "PresentationFramework.dll") | ForEach-Object {
             $path = Join-Path "artifacts\publish\AgentGuard" $_
             if (-not (Test-Path $path)) {
               throw "WPF runtime dependency missing after bridge merge: $_"
             }
+          }
+          $wpfHashAfter = (Get-FileHash artifacts\publish\AgentGuard\WindowsBase.dll -Algorithm SHA256).Hash
+          if ($wpfHashBefore -ne $wpfHashAfter) {
+            throw "Bridge merge replaced the WPF WindowsBase.dll runtime."
           }
 
       - name: Launch packaged app

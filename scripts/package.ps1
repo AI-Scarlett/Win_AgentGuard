@@ -50,12 +50,17 @@ try {
     -p:PublishReadyToRun=false `
     -o $bridgeOut
 
-  Copy-Item (Join-Path $bridgeOut "*") $appOut -Recurse -Force
+  $wpfHashBefore = (Get-FileHash (Join-Path $appOut "WindowsBase.dll") -Algorithm SHA256).Hash
+  Copy-Item (Join-Path $bridgeOut "agentguard-bridge.*") $appOut -Force
   @("WindowsBase.dll", "PresentationCore.dll", "PresentationFramework.dll") | ForEach-Object {
     $path = Join-Path $appOut $_
     if (-not (Test-Path $path)) {
       throw "WPF runtime dependency missing after bridge merge: $_"
     }
+  }
+  $wpfHashAfter = (Get-FileHash (Join-Path $appOut "WindowsBase.dll") -Algorithm SHA256).Hash
+  if ($wpfHashBefore -ne $wpfHashAfter) {
+    throw "Bridge merge replaced the WPF WindowsBase.dll runtime."
   }
   Compress-Archive -Path (Join-Path $appOut "*") -DestinationPath $packagePath -Force
   Write-Host "Package created: $packagePath"
