@@ -6,12 +6,15 @@ namespace AgentGuard.App;
 
 public partial class MainWindow : Window
 {
-    private readonly MainViewModel _viewModel = new(App.Notifications);
+    private readonly MainViewModel _viewModel;
 
     public MainWindow()
     {
         InitializeComponent();
+        AppDiagnostics.Log("Main window XAML initialized.");
+        _viewModel = new MainViewModel(App.Notifications);
         DataContext = _viewModel;
+        AppDiagnostics.Log("Main view model created.");
     }
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)

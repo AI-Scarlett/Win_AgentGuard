@@ -12,7 +12,6 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         AppDiagnostics.Log("AgentGuard starting.");
-        AppThemeService.Apply("porcelain", "system");
         AppDomain.CurrentDomain.UnhandledException += (_, args) =>
             AppDiagnostics.Log("Unhandled app-domain exception.", args.ExceptionObject as Exception);
         TaskScheduler.UnobservedTaskException += (_, args) =>
@@ -33,14 +32,33 @@ public partial class App : Application
 
         try
         {
-            Notifications = new WindowsToastNotificationService(new AppPaths());
+            base.OnStartup(e);
+            AppThemeService.Apply("porcelain", "system");
+
+            try
+            {
+                Notifications = new WindowsToastNotificationService(new AppPaths());
+            }
+            catch (Exception ex)
+            {
+                AppDiagnostics.Log("Toast notification service init failed; using null service.", ex);
+                Notifications = new NullNotificationService();
+            }
+
+            AppDiagnostics.Log("Creating main window.");
+            MainWindow = new MainWindow();
+            MainWindow.Show();
+            AppDiagnostics.Log("Main window shown.");
         }
         catch (Exception ex)
         {
-            AppDiagnostics.Log("Toast notification service init failed; using null service.", ex);
-            Notifications = new NullNotificationService();
+            AppDiagnostics.Log("Fatal startup failure.", ex);
+            MessageBox.Show(
+                $"AgentGuard could not start.\n\nLog: {AppDiagnostics.LogPath}\n\n{ex}",
+                "AgentGuard startup error",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+            Shutdown(-1);
         }
-
-        base.OnStartup(e);
     }
 }

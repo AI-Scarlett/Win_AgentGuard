@@ -56,6 +56,29 @@ jobs:
           dotnet publish .\src\AgentGuard.HookBridge\AgentGuard.HookBridge.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -p:PublishReadyToRun=false -o artifacts\publish\HookBridge
           Copy-Item artifacts\publish\HookBridge\* artifacts\publish\AgentGuard -Recurse -Force
 
+      - name: Launch packaged app
+        shell: pwsh
+        run: |
+          $log = Join-Path $env:APPDATA "AgentGuard\logs\app.log"
+          Remove-Item $log -Force -ErrorAction SilentlyContinue
+          $process = Start-Process -FilePath artifacts\publish\AgentGuard\AgentGuard.exe -PassThru
+          Start-Sleep -Seconds 8
+          if ($process.HasExited) {
+            if (Test-Path $log) {
+              Get-Content $log
+            }
+            throw "Published AgentGuard.exe exited during launch verification with code $($process.ExitCode)."
+          }
+          $process.Refresh()
+          if ($process.MainWindowHandle -eq 0) {
+            if (Test-Path $log) {
+              Get-Content $log
+            }
+            Stop-Process -Id $process.Id -Force
+            throw "Published AgentGuard.exe did not create a main window."
+          }
+          Stop-Process -Id $process.Id -Force
+
       - name: Create portable zip
         shell: pwsh
         run: Compress-Archive -Path artifacts\publish\AgentGuard\* -DestinationPath artifacts\AgentGuard-Windows-Release-win-x64.zip -Force

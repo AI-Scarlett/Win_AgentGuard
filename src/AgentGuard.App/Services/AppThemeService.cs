@@ -66,17 +66,24 @@ public static class AppThemeService
     private static void EnsureSystemThemeWatcher()
     {
         if (_watchingSystemTheme) return;
-        SystemEvents.UserPreferenceChanged += (_, args) =>
+        try
         {
-            if (args.Category is not (UserPreferenceCategory.General or UserPreferenceCategory.Color or UserPreferenceCategory.VisualStyle) ||
-                !_currentAppearance.Equals("system", StringComparison.OrdinalIgnoreCase))
+            SystemEvents.UserPreferenceChanged += (_, args) =>
             {
-                return;
-            }
+                if (args.Category is not (UserPreferenceCategory.General or UserPreferenceCategory.Color or UserPreferenceCategory.VisualStyle) ||
+                    !_currentAppearance.Equals("system", StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
 
-            Application.Current?.Dispatcher.BeginInvoke(() => Apply(_currentPalette, _currentAppearance));
-        };
-        _watchingSystemTheme = true;
+                Application.Current?.Dispatcher.BeginInvoke(() => Apply(_currentPalette, _currentAppearance));
+            };
+            _watchingSystemTheme = true;
+        }
+        catch
+        {
+            // Theme switching still works even when the system event source is unavailable.
+        }
     }
 
     private static void Put(ResourceDictionary resources, string key, object value) => resources[key] = value;
